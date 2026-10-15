@@ -1,0 +1,1298 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>kelenbarber – Admin</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Inter, Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+    input, select, textarea { -webkit-appearance: none; appearance: none; }
+    input[type="radio"], input[type="checkbox"] { -webkit-appearance: auto; appearance: auto; }
+    @media (max-width: 640px) { input, select, textarea { font-size: 16px !important; } }
+    select { background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none' stroke='%2386868b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M1 1.5l5 5 5-5'/></svg>"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px !important; }
+  </style>
+</head>
+
+<body class="bg-[#f5f5f7] text-[#1d1d1f] min-h-screen">
+
+  <!-- BEJELENTKEZÉS -->
+  <section id="login" class="min-h-screen flex items-center justify-center px-6">
+    <form id="login-form" class="w-full max-w-sm bg-white rounded-3xl p-8 shadow-[0_20px_60px_rgba(0,0,0,.06)] space-y-5">
+      <h1 class="text-2xl font-semibold tracking-tight">kelenbarber admin</h1>
+      <div>
+        <label for="l_email" class="block text-sm font-medium mb-2">E-mail</label>
+        <input id="l_email" type="email" required autocomplete="username"
+               class="w-full rounded-2xl bg-[#f5f5f7] px-4 py-3 outline-none ring-2 ring-transparent focus:ring-black/80 transition" />
+      </div>
+      <div>
+        <label for="l_pass" class="block text-sm font-medium mb-2">Jelszó</label>
+        <input id="l_pass" type="password" required autocomplete="current-password"
+               class="w-full rounded-2xl bg-[#f5f5f7] px-4 py-3 outline-none ring-2 ring-transparent focus:ring-black/80 transition" />
+      </div>
+      <p id="login-error" class="hidden rounded-2xl bg-red-50 text-red-700 px-4 py-3 text-sm"></p>
+      <button class="w-full rounded-full bg-black text-white py-3.5 font-medium hover:bg-black/85 transition">Belépés</button>
+    </form>
+  </section>
+
+  <!-- ADMIN FELÜLET -->
+  <div id="app" class="hidden">
+    <header class="bg-white border-b border-black/10 sticky top-0 z-20">
+      <div class="max-w-4xl mx-auto px-5 h-14 flex items-center justify-between">
+        <span class="font-semibold">kelenbarber admin</span>
+        <button id="logout" class="text-sm text-[#6e6e73] hover:text-black transition">Kilépés</button>
+      </div>
+      <nav class="max-w-4xl mx-auto px-5 flex gap-1 overflow-x-auto text-sm" id="tabs">
+        <button data-tab="slots" class="tab px-4 py-3 font-medium border-b-2 whitespace-nowrap">Időpontok</button>
+        <button data-tab="bookings" class="tab px-4 py-3 font-medium border-b-2 whitespace-nowrap">Foglalások</button>
+        <button data-tab="gallery" class="tab px-4 py-3 font-medium border-b-2 whitespace-nowrap">Galéria</button>
+        <button data-tab="vision" class="tab px-4 py-3 font-medium border-b-2 whitespace-nowrap">Vízió</button>
+        <button data-tab="reviews" class="tab px-4 py-3 font-medium border-b-2 whitespace-nowrap">Értékelések</button>
+        <button data-tab="settings" class="tab px-4 py-3 font-medium border-b-2 whitespace-nowrap">Beállítások</button>
+      </nav>
+    </header>
+
+    <main class="max-w-4xl mx-auto px-5 py-8">
+
+      <!-- ===== IDŐPONTOK ===== -->
+      <section id="tab-slots" class="tab-panel space-y-6">
+
+        <div class="grid md:grid-cols-2 gap-6">
+          <!-- Naptár -->
+          <div class="bg-white rounded-3xl p-5">
+            <div class="flex items-center justify-between mb-4">
+              <button id="cal-prev" type="button" class="w-9 h-9 rounded-full bg-[#f5f5f7] hover:bg-black/10 transition text-lg leading-none" aria-label="Előző hónap">‹</button>
+              <h2 id="cal-title" class="font-semibold capitalize"></h2>
+              <button id="cal-next" type="button" class="w-9 h-9 rounded-full bg-[#f5f5f7] hover:bg-black/10 transition text-lg leading-none" aria-label="Következő hónap">›</button>
+            </div>
+            <div class="grid grid-cols-7 text-center text-[11px] uppercase tracking-wider text-[#86868b] mb-2">
+              <span>H</span><span>K</span><span>Sze</span><span>Cs</span><span>P</span><span>Szo</span><span>V</span>
+            </div>
+            <div id="cal-grid" class="grid grid-cols-7 gap-1"></div>
+            <p class="text-xs text-[#86868b] mt-4">A szám a szabad időpontok száma, a fekete pont foglalást jelent.</p>
+          </div>
+
+          <!-- Kiválasztott nap -->
+          <div class="bg-white rounded-3xl p-5 flex flex-col">
+            <h2 id="day-title" class="font-semibold capitalize"></h2>
+            <p id="day-sub" class="text-sm text-[#6e6e73] mb-4"></p>
+            <div id="day-slots" class="flex flex-wrap gap-2"></div>
+
+            <div id="day-quick" class="mt-auto pt-5">
+              <div class="border-t border-black/10 pt-4 flex flex-wrap items-center gap-2">
+                <div id="q_time"></div>
+                <button id="q_add" type="button" class="rounded-full bg-black text-white px-4 py-2 text-sm font-medium hover:bg-black/85 transition">+ Időpont</button>
+                <button id="q_clear" type="button" class="ml-auto text-sm text-red-600 hover:underline">Szabad időpontok törlése</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Nap tervezése -->
+        <div class="bg-white rounded-3xl p-6 space-y-7">
+          <div>
+            <h2 class="text-lg font-semibold">Nap tervezése</h2>
+            <p id="plan-for" class="text-sm text-[#6e6e73] capitalize"></p>
+          </div>
+
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <div>
+              <label class="block text-xs font-medium mb-1 text-[#6e6e73]">Nyitás</label>
+              <div id="p_open"></div>
+            </div>
+            <div>
+              <label class="block text-xs font-medium mb-1 text-[#6e6e73]">Zárás</label>
+              <div id="p_close"></div>
+            </div>
+            <div class="col-span-2 sm:col-span-1">
+              <label class="block text-xs font-medium mb-1 text-[#6e6e73]">Egy időpont hossza (perc)</label>
+              <input id="p_step" type="number" min="5" max="480" step="1" inputmode="numeric" class="w-full rounded-xl bg-[#f5f5f7] px-3 py-2.5 outline-none text-sm" />
+            </div>
+          </div>
+
+          <div>
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-sm font-medium">Szünetek</span>
+              <button id="add-break" type="button" class="rounded-full bg-[#f5f5f7] hover:bg-black/10 px-4 py-1.5 text-sm font-medium transition">+ Szünet</button>
+            </div>
+            <div id="break-list" class="space-y-2"></div>
+          </div>
+
+          <div>
+            <div class="flex items-baseline justify-between mb-3">
+              <span class="text-sm font-medium">Előnézet</span>
+              <span id="preview-count" class="text-xs text-[#86868b]"></span>
+            </div>
+            <div id="preview" class="flex flex-wrap gap-2"></div>
+            <p class="text-xs text-[#86868b] mt-3">Kattints egy időpontra, hogy kihagyd (áthúzva látszik), vagy újra visszavedd.</p>
+          </div>
+
+          <div>
+            <span class="text-sm font-medium block mb-3">Ismétlés</span>
+            <div id="weekday-chips" class="flex flex-wrap gap-2 mb-3"></div>
+            <div class="flex items-center gap-3">
+              <select id="p_weeks" class="rounded-xl bg-[#f5f5f7] px-3 py-2.5 outline-none text-sm"></select>
+            </div>
+            <p class="text-xs text-[#86868b] mt-3">Ha hetekre előre is beállítod, a terv a kiválasztott napokon ismétlődik. Ha nem jelölsz napot, a kiválasztott nap ismétlődik hetente.</p>
+          </div>
+
+          <div class="space-y-2">
+            <span class="text-sm font-medium block mb-1">Mentés módja</span>
+            <label class="flex items-start gap-3 text-sm cursor-pointer">
+              <input type="radio" name="mode" value="add" checked class="mt-1 accent-black" />
+              <span>Hozzáadás a meglévő időpontokhoz</span>
+            </label>
+            <label class="flex items-start gap-3 text-sm cursor-pointer">
+              <input type="radio" name="mode" value="replace" class="mt-1 accent-black" />
+              <span>A nap szabad időpontjainak lecserélése <span class="text-[#86868b]">(a már lefoglaltak megmaradnak)</span></span>
+            </label>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-4">
+            <button id="plan-save" type="button" class="rounded-full bg-black text-white px-7 py-3 text-sm font-medium hover:bg-black/85 transition disabled:opacity-40 disabled:cursor-not-allowed">Időpontok mentése</button>
+            <span id="plan-summary" class="text-sm text-[#6e6e73]"></span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== FOGLALÁSOK ===== -->
+      <section id="tab-bookings" class="tab-panel hidden">
+        <h2 class="text-lg font-semibold mb-4">Közelgő foglalások</h2>
+        <div id="booking-list" class="space-y-3"></div>
+
+        <div class="bg-white rounded-3xl p-6 space-y-6 mt-10">
+          <div>
+            <h2 class="text-lg font-semibold">Adatok törlése</h2>
+            <p class="text-sm text-[#6e6e73]">Az adatkezelési tájékoztató szerint a foglalások adatait a foglalt időpont után legfeljebb 12 hónapig őrizzük. A törlés végleges.</p>
+          </div>
+          <div>
+            <button id="purge-old" type="button" class="rounded-full bg-[#f5f5f7] hover:bg-black/10 px-5 py-2.5 text-sm font-medium transition">12 hónapnál régebbi foglalások törlése</button>
+          </div>
+          <div class="border-t border-black/10 pt-5 space-y-3">
+            <label for="erase_q" class="block text-sm font-medium">Egy vendég összes foglalásának törlése (törlési kérés esetén)</label>
+            <div class="flex flex-wrap gap-2">
+              <input id="erase_q" type="text" placeholder="E-mail cím vagy telefonszám"
+                     class="flex-1 min-w-[12rem] rounded-xl bg-[#f5f5f7] px-4 py-2.5 outline-none text-sm ring-2 ring-transparent focus:ring-black/80 transition" />
+              <button id="erase_btn" type="button" class="rounded-full bg-red-50 text-red-700 hover:bg-red-100 px-5 py-2.5 text-sm font-medium transition">Keresés és törlés</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== GALÉRIA ===== -->
+      <section id="tab-gallery" class="tab-panel hidden space-y-8">
+        <div class="bg-white rounded-3xl p-6 space-y-4">
+          <h2 class="text-lg font-semibold">Képek feltöltése</h2>
+          <input id="g_files" type="file" accept="image/*" multiple
+                 class="block w-full text-sm file:mr-4 file:rounded-full file:border-0 file:bg-black file:text-white file:px-5 file:py-2.5 file:font-medium file:cursor-pointer" />
+          <button id="g_upload" class="rounded-full bg-black text-white px-6 py-2.5 text-sm font-medium hover:bg-black/85 transition disabled:opacity-50">Feltöltés</button>
+          <p id="g_status" class="text-sm text-[#6e6e73]"></p>
+        </div>
+        <div id="gallery-admin" class="grid grid-cols-2 sm:grid-cols-3 gap-3"></div>
+      </section>
+
+      <!-- ===== VÍZIÓ ===== -->
+      <section id="tab-vision" class="tab-panel hidden space-y-6">
+
+        <!-- Főoldali rész -->
+        <div class="bg-white rounded-3xl p-6 space-y-6">
+          <div>
+            <h2 class="text-lg font-semibold">Főoldali Vízió</h2>
+            <p class="text-sm text-[#6e6e73]">Ez látszik a főoldalon a sötét Vízió kártyán: a nagy főcím, alatta a Megnézem gomb és a rövid szöveg, mellette a kép.</p>
+          </div>
+
+          <div>
+            <label for="v_title" class="block text-sm font-medium mb-2">Főcím</label>
+            <input id="v_title" type="text" maxlength="80" placeholder="Több mint hajvágás."
+                   class="w-full rounded-2xl bg-[#f5f5f7] px-4 py-3 outline-none ring-2 ring-transparent focus:ring-black/80 transition" />
+          </div>
+
+          <div>
+            <label for="v_teaser" class="block text-sm font-medium mb-2">Rövid szöveg (a főcím és a gomb alatt)</label>
+            <textarea id="v_teaser" rows="4" maxlength="400"
+                      class="w-full rounded-2xl bg-[#f5f5f7] px-4 py-3 outline-none ring-2 ring-transparent focus:ring-black/80 transition resize-y"></textarea>
+          </div>
+
+          <div>
+            <span class="block text-sm font-medium mb-2">Főoldali kép (nem kötelező)</span>
+            <div class="flex items-start gap-5">
+              <div id="v_preview" class="w-32 h-40 shrink-0 rounded-2xl bg-[#f5f5f7] overflow-hidden flex items-center justify-center text-xs text-[#86868b]">Nincs kép</div>
+              <div class="space-y-3">
+                <input id="v_file" type="file" accept="image/*"
+                       class="block w-full text-sm file:mr-4 file:rounded-full file:border-0 file:bg-black file:text-white file:px-5 file:py-2.5 file:font-medium file:cursor-pointer" />
+                <button id="v_remove" type="button" class="text-sm text-red-600 hover:underline">Kép eltávolítása</button>
+              </div>
+            </div>
+          </div>
+
+          <button id="v_save" type="button" class="rounded-full bg-black text-white px-7 py-3 text-sm font-medium hover:bg-black/85 transition disabled:opacity-50">Főoldali rész mentése</button>
+        </div>
+
+        <!-- Vízió oldal: több kép + szöveg -->
+        <div class="bg-white rounded-3xl p-6 space-y-6">
+          <div class="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h2 class="text-lg font-semibold">Történet (Vízió oldal)</h2>
+              <p class="text-sm text-[#6e6e73]">Minden elemhez kép és szöveg tartozik. Elemenként mented őket, a nyilakkal rendezheted a sorrendet.</p>
+            </div>
+            <button id="vi-add" type="button" class="rounded-full bg-black text-white px-5 py-2.5 text-sm font-medium hover:bg-black/85 transition">+ Új kép és szöveg</button>
+          </div>
+          <div class="rounded-2xl bg-[#f5f5f7] p-4 text-sm text-[#6e6e73] space-y-1.5">
+            <p class="font-medium text-[#1d1d1f]">Szöveg formázása</p>
+            <p><code class="font-mono text-[#1d1d1f]">**így**</code> írva a kulcsszavak félkövérek lesznek.</p>
+            <p><code class="font-mono text-[#1d1d1f]"># Cím</code> nagy címet, <code class="font-mono text-[#1d1d1f]">## Cím</code> kisebb címet ad. Üres sor új bekezdést kezd.</p>
+            <p>Automatikus elrendezésnél az első elem képe a szöveg mögé kerül, a többi váltakozva a szöveg mellé. Az utolsó elem középre kerül, alatta Foglalás gombbal.</p>
+          </div>
+          <div id="vi-list" class="space-y-4"></div>
+        </div>
+      </section>
+
+      <!-- ===== ÉRTÉKELÉSEK ===== -->
+      <section id="tab-reviews" class="tab-panel hidden">
+        <h2 class="text-lg font-semibold mb-4">Értékelések</h2>
+        <div id="review-admin" class="space-y-3"></div>
+      </section>
+
+      <!-- ===== BEÁLLÍTÁSOK ===== -->
+      <section id="tab-settings" class="tab-panel hidden space-y-6">
+        <div class="bg-white rounded-3xl p-6 space-y-5 max-w-lg">
+          <div>
+            <h2 class="text-lg font-semibold">Hajvágás ára</h2>
+            <p class="text-sm text-[#6e6e73]">Ez az ár látszik a weboldal foglalási részén.</p>
+          </div>
+          <div>
+            <label for="st_price" class="block text-sm font-medium mb-2">Ár (Ft)</label>
+            <input id="st_price" type="number" min="1" max="1000000" step="1" inputmode="numeric"
+                   class="w-full rounded-2xl bg-[#f5f5f7] px-4 py-3 outline-none ring-2 ring-transparent focus:ring-black/80 transition" />
+            <p id="st_price_hint" class="text-xs text-[#86868b] mt-2"></p>
+          </div>
+          <button id="st_save" type="button" class="rounded-full bg-black text-white px-7 py-3 text-sm font-medium hover:bg-black/85 transition disabled:opacity-50">Ár mentése</button>
+        </div>
+
+        <div class="bg-white rounded-3xl p-6 space-y-5 max-w-lg">
+          <div>
+            <h2 class="text-lg font-semibold">Adatkezelő adatai</h2>
+            <p class="text-sm text-[#6e6e73]">Ezek jelennek meg a weboldal adatkezelési tájékoztatójában. Add meg a saját (vagy a vállalkozásod) adatait.</p>
+          </div>
+          <div>
+            <label for="ow_name" class="block text-sm font-medium mb-2">Név / cégnév</label>
+            <input id="ow_name" type="text" maxlength="120" class="w-full rounded-2xl bg-[#f5f5f7] px-4 py-3 outline-none ring-2 ring-transparent focus:ring-black/80 transition" />
+          </div>
+          <div>
+            <label for="ow_address" class="block text-sm font-medium mb-2">Cím</label>
+            <input id="ow_address" type="text" maxlength="200" class="w-full rounded-2xl bg-[#f5f5f7] px-4 py-3 outline-none ring-2 ring-transparent focus:ring-black/80 transition" />
+          </div>
+          <div>
+            <label for="ow_email" class="block text-sm font-medium mb-2">E-mail cím</label>
+            <input id="ow_email" type="email" maxlength="120" class="w-full rounded-2xl bg-[#f5f5f7] px-4 py-3 outline-none ring-2 ring-transparent focus:ring-black/80 transition" />
+          </div>
+          <div>
+            <label for="ow_phone" class="block text-sm font-medium mb-2">Telefonszám</label>
+            <input id="ow_phone" type="tel" maxlength="40" class="w-full rounded-2xl bg-[#f5f5f7] px-4 py-3 outline-none ring-2 ring-transparent focus:ring-black/80 transition" />
+          </div>
+          <div>
+            <label for="ow_taxid" class="block text-sm font-medium mb-2">Adószám / nyilvántartási szám <span class="text-[#86868b] font-normal">(nem kötelező)</span></label>
+            <input id="ow_taxid" type="text" maxlength="60" class="w-full rounded-2xl bg-[#f5f5f7] px-4 py-3 outline-none ring-2 ring-transparent focus:ring-black/80 transition" />
+          </div>
+          <button id="ow_save" type="button" class="rounded-full bg-black text-white px-7 py-3 text-sm font-medium hover:bg-black/85 transition disabled:opacity-50">Adatok mentése</button>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="toast" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-full bg-black text-white px-5 py-2.5 text-sm shadow-lg"></div>
+
+  <script>
+    const SUPABASE_URL = "https://mvypsplzbmcucytfeaav.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im12eXBzcGx6Ym1jdWN5dGZlYWF2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE5MDg1NDIsImV4cCI6MjEwNzQ4NDU0Mn0.E-EBAkhzoFoudMnmcD_02btv6VQcfiR3yX2ofuPOEaQ";
+    const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    /* ---------- segédek ---------- */
+    const $ = (id) => document.getElementById(id);
+    const pad = (n) => String(n).padStart(2, "0");
+    const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    const hm = (t) => t.slice(0, 5);
+    const fmtISO = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    const parseDate = (s) => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
+    const fmtDate = (s) => parseDate(s).toLocaleDateString("hu-HU", { weekday: "long", month: "long", day: "numeric" });
+    const todayStr = () => fmtISO(new Date());
+    const fmtMin = (m) => `${pad(Math.floor(m / 60))}:${pad(m % 60)}`;
+    const chunk = (arr, n) => { const out = []; for (let i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n)); return out; };
+
+    let toastTimer;
+    function toast(msg) {
+      const t = $("toast");
+      t.textContent = msg; t.classList.remove("hidden");
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => t.classList.add("hidden"), 3200);
+    }
+
+    const SELECT_CLS = "rounded-xl bg-[#f5f5f7] px-3 py-2.5 outline-none text-sm";
+
+    // Óra + perc választó: bármelyik perc kiválasztható (nem csak 15 percenként)
+    function makeTimePicker(container, initialMin, onChange) {
+      container.innerHTML = "";
+      container.className = "flex items-center gap-1";
+      const mkSel = (max, label) => {
+        const sel = document.createElement("select");
+        sel.className = SELECT_CLS;
+        sel.setAttribute("aria-label", label);
+        for (let i = 0; i <= max; i++) {
+          const o = document.createElement("option");
+          o.value = String(i); o.textContent = pad(i);
+          sel.appendChild(o);
+        }
+        return sel;
+      };
+      const h = mkSel(23, "Óra"), m = mkSel(59, "Perc");
+      const sep = document.createElement("span");
+      sep.textContent = ":"; sep.className = "text-[#86868b]";
+      const api = {
+        get: () => Number(h.value) * 60 + Number(m.value),
+        set: (min) => { h.value = String(Math.floor(min / 60)); m.value = String(min % 60); }
+      };
+      api.set(initialMin);
+      const fire = () => { if (onChange) onChange(api.get()); };
+      h.addEventListener("change", fire);
+      m.addEventListener("change", fire);
+      container.append(h, sep, m);
+      return api;
+    }
+
+    /* ---------- bejelentkezés ---------- */
+    let authed = false;
+    function setAuth(on) {
+      $("login").classList.toggle("hidden", on);
+      $("app").classList.toggle("hidden", !on);
+      if (on && !authed) { authed = true; showTab("slots"); initSlotsUI(); loadAll(); }
+      if (!on) authed = false;
+    }
+    db.auth.getSession().then(({ data }) => setAuth(!!data.session));
+    db.auth.onAuthStateChange((_e, session) => setAuth(!!session));
+
+    $("login-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      $("login-error").classList.add("hidden");
+      const { error } = await db.auth.signInWithPassword({ email: $("l_email").value.trim(), password: $("l_pass").value });
+      if (error) {
+        $("login-error").textContent = "Hibás e-mail vagy jelszó.";
+        $("login-error").classList.remove("hidden");
+      }
+    });
+    $("logout").addEventListener("click", () => db.auth.signOut());
+
+    /* ---------- fülek ---------- */
+    function showTab(name) {
+      document.querySelectorAll(".tab-panel").forEach((p) => p.classList.toggle("hidden", p.id !== "tab-" + name));
+      document.querySelectorAll(".tab").forEach((b) => {
+        const on = b.dataset.tab === name;
+        b.classList.toggle("border-black", on);
+        b.classList.toggle("text-black", on);
+        b.classList.toggle("border-transparent", !on);
+        b.classList.toggle("text-[#86868b]", !on);
+      });
+    }
+    $("tabs").addEventListener("click", (e) => {
+      const b = e.target.closest(".tab");
+      if (b) showTab(b.dataset.tab);
+    });
+
+    function loadAll() { loadSlots(); loadBookings(); loadGallery(); loadVision(); loadReviews(); loadSettings(); loadOwner(); }
+
+    /* =====================================================
+       IDŐPONTOK: naptár + nap nézet + tervező
+       ===================================================== */
+    let view = new Date(); view.setDate(1);          // megjelenített hónap
+    let selDate = todayStr();                        // kiválasztott nap
+    let monthSlots = [];                             // a hónap kiadott időpontjai
+    let monthBookings = [];                          // a hónap megerősített foglalásai
+    let loadSeq = 0;
+    let busy = false;
+
+    const WEEKDAYS = [{ l: "H", d: 1 }, { l: "K", d: 2 }, { l: "Sze", d: 3 }, { l: "Cs", d: 4 }, { l: "P", d: 5 }, { l: "Szo", d: 6 }, { l: "V", d: 0 }];
+
+    const plan = { open: 9 * 60, close: 17 * 60, step: 30, breaks: [], excluded: new Set(), repeatDays: new Set(), weeks: 0 };
+    try {
+      const saved = JSON.parse(localStorage.getItem("kb_plan") || "null");
+      if (saved) {
+        if (Number.isFinite(saved.open)) plan.open = saved.open;
+        if (Number.isFinite(saved.close)) plan.close = saved.close;
+        if (Number.isFinite(saved.step)) plan.step = saved.step;
+        if (Array.isArray(saved.breaks)) plan.breaks = saved.breaks.filter((b) => Number.isFinite(b.from) && Number.isFinite(b.to));
+      }
+    } catch (_) { /* nincs mentett terv */ }
+    function persistPlan() {
+      try { localStorage.setItem("kb_plan", JSON.stringify({ open: plan.open, close: plan.close, step: plan.step, breaks: plan.breaks })); } catch (_) {}
+    }
+
+    const isPast = () => selDate < todayStr();
+
+    /* --- adatbetöltés (hónaponként) --- */
+    async function loadSlots() {
+      const seq = ++loadSeq;
+      const y = view.getFullYear(), m = view.getMonth();
+      const start = `${y}-${pad(m + 1)}-01`;
+      const end = `${y}-${pad(m + 1)}-${pad(new Date(y, m + 1, 0).getDate())}`;
+      const [s, b] = await Promise.all([
+        db.from("available_slots").select("id,slot_date,slot_time").gte("slot_date", start).lte("slot_date", end).order("slot_date").order("slot_time"),
+        db.from("bookings").select("booking_date,booking_time,guest_name").eq("status", "confirmed").gte("booking_date", start).lte("booking_date", end)
+      ]);
+      if (seq !== loadSeq) return;           // közben másik hónapra lapoztak
+      if (s.error || b.error) { console.error(s.error || b.error); return toast("Az időpontok betöltése nem sikerült."); }
+      monthSlots = s.data; monthBookings = b.data;
+      renderCalendar(); renderDay(); renderPlannerHeader();
+    }
+
+    const bookedMap = () => new Map(monthBookings.map((x) => [x.booking_date + "|" + hm(x.booking_time), x.guest_name]));
+
+    /* --- naptár --- */
+    function renderCalendar() {
+      const y = view.getFullYear(), m = view.getMonth();
+      $("cal-title").textContent = view.toLocaleDateString("hu-HU", { year: "numeric", month: "long" });
+      const lead = (new Date(y, m, 1).getDay() + 6) % 7;
+      const days = new Date(y, m + 1, 0).getDate();
+      const booked = bookedMap();
+      const today = todayStr();
+      const grid = $("cal-grid");
+      grid.innerHTML = "";
+
+      for (let i = 0; i < lead; i++) grid.appendChild(document.createElement("div"));
+
+      for (let d = 1; d <= days; d++) {
+        const iso = `${y}-${pad(m + 1)}-${pad(d)}`;
+        const daySlots = monthSlots.filter((s) => s.slot_date === iso);
+        const bookedCount = daySlots.filter((s) => booked.has(iso + "|" + hm(s.slot_time))).length;
+        const free = daySlots.length - bookedCount;
+        const sel = iso === selDate, past = iso < today, isToday = iso === today;
+
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "relative aspect-square rounded-xl text-sm flex flex-col items-center justify-center transition " +
+          (sel ? "bg-black text-white" : past ? "text-[#c7c7cc] hover:bg-[#f5f5f7]" : "hover:bg-[#f5f5f7]") +
+          (isToday && !sel ? " ring-2 ring-black/20" : "");
+        b.innerHTML = `<span class="leading-none">${d}</span>` +
+          (free > 0 ? `<span class="text-[10px] leading-none mt-1 ${sel ? "text-white/70" : "text-[#86868b]"}">${free}</span>` : "") +
+          (bookedCount > 0 ? `<span class="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full ${sel ? "bg-white" : "bg-black"}"></span>` : "");
+        b.addEventListener("click", () => { selDate = iso; renderCalendar(); renderDay(); renderPlannerHeader(); renderPreview(); });
+        grid.appendChild(b);
+      }
+    }
+
+    function shiftMonth(delta) {
+      view = new Date(view.getFullYear(), view.getMonth() + delta, 1);
+      const now = new Date();
+      selDate = (view.getFullYear() === now.getFullYear() && view.getMonth() === now.getMonth()) ? todayStr() : fmtISO(view);
+      loadSlots();
+    }
+
+    /* --- kiválasztott nap --- */
+    function renderDay() {
+      const booked = bookedMap();
+      const items = monthSlots.filter((s) => s.slot_date === selDate);
+      const past = isPast();
+      $("day-title").textContent = fmtDate(selDate);
+      const freeCount = items.filter((s) => !booked.has(selDate + "|" + hm(s.slot_time))).length;
+      $("day-sub").textContent = items.length
+        ? `${items.length} időpont · ${freeCount} szabad · ${items.length - freeCount} foglalt`
+        : "Erre a napra még nincs kiadott időpont.";
+
+      const box = $("day-slots");
+      box.innerHTML = "";
+      items.forEach((s) => {
+        const name = booked.get(selDate + "|" + hm(s.slot_time));
+        const chip = document.createElement("span");
+        if (name) {
+          chip.className = "rounded-xl bg-black text-white px-3 py-1.5 text-sm tabular-nums";
+          chip.textContent = `${hm(s.slot_time)} · ${name}`;
+        } else {
+          chip.className = "rounded-xl bg-[#f5f5f7] px-3 py-1.5 text-sm tabular-nums inline-flex items-center gap-2";
+          chip.innerHTML = `${esc(hm(s.slot_time))}<button type="button" data-del="${esc(s.id)}" class="text-[#86868b] hover:text-red-600" aria-label="Törlés">✕</button>`;
+        }
+        box.appendChild(chip);
+      });
+
+      $("day-quick").classList.toggle("hidden", past);
+      $("q_clear").classList.toggle("hidden", freeCount === 0);
+    }
+
+    $("day-slots").addEventListener("click", async (e) => {
+      const btn = e.target.closest("[data-del]");
+      if (!btn) return;
+      const { error } = await db.from("available_slots").delete().eq("id", btn.dataset.del);
+      if (error) { console.error(error); return toast("Hiba: " + error.message); }
+      loadSlots();
+    });
+
+    $("q_add").addEventListener("click", async () => {
+      if (isPast()) return;
+      const t = fmtMin(qPicker.get());
+      const { error } = await db.from("available_slots").upsert([{ slot_date: selDate, slot_time: t }], { onConflict: "slot_date,slot_time", ignoreDuplicates: true });
+      if (error) { console.error(error); return toast("Hiba: " + error.message); }
+      toast(t + " hozzáadva");
+      loadSlots();
+    });
+
+    $("q_clear").addEventListener("click", async () => {
+      const booked = bookedMap();
+      const ids = monthSlots.filter((s) => s.slot_date === selDate && !booked.has(selDate + "|" + hm(s.slot_time))).map((s) => s.id);
+      if (!ids.length) return;
+      if (!confirm("Biztosan törlöd a nap összes szabad időpontját? A lefoglaltak megmaradnak.")) return;
+      for (const part of chunk(ids, 80)) {
+        const { error } = await db.from("available_slots").delete().in("id", part);
+        if (error) { console.error(error); return toast("Hiba: " + error.message); }
+      }
+      toast("Szabad időpontok törölve");
+      loadSlots();
+    });
+
+    /* --- tervező --- */
+    function renderPlannerHeader() {
+      const past = isPast();
+      $("plan-for").textContent = past ? "Múltbeli napra nem adható ki időpont." : "Kiválasztott nap: " + fmtDate(selDate);
+      $("plan-save").disabled = past;
+    }
+
+    function computeTimes() {
+      const { open, close, step } = plan;
+      const out = [];
+      if (close <= open) return out;
+      const vb = plan.breaks.filter((b) => b.to > b.from);
+      for (let m = open; m + step <= close; m += step) {
+        // az időpont [m, m+step) nem eshet bele egy szünetbe
+        if (vb.some((b) => m < b.to && m + step > b.from)) continue;
+        out.push(m);
+      }
+      return out;
+    }
+    const finalTimes = () => computeTimes().filter((m) => !plan.excluded.has(m));
+
+    function collectDates() {
+      const base = parseDate(selDate);
+      const dates = [selDate];
+      if (plan.weeks > 0) {
+        const days = plan.repeatDays.size ? plan.repeatDays : new Set([base.getDay()]);
+        for (let i = 1; i <= plan.weeks * 7; i++) {
+          const d = new Date(base.getFullYear(), base.getMonth(), base.getDate() + i);
+          if (days.has(d.getDay())) dates.push(fmtISO(d));
+        }
+      }
+      return dates;
+    }
+
+    function renderPreview() {
+      const all = computeTimes();
+      const box = $("preview");
+      box.innerHTML = "";
+      if (plan.close <= plan.open) {
+        box.innerHTML = `<p class="text-sm text-red-600">A zárásnak későbbinek kell lennie a nyitásnál.</p>`;
+      } else if (!all.length) {
+        box.innerHTML = `<p class="text-sm text-[#86868b]">Ezekkel a beállításokkal nem jön ki egyetlen időpont sem.</p>`;
+      }
+      all.forEach((m) => {
+        const off = plan.excluded.has(m);
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "rounded-xl px-3 py-1.5 text-sm tabular-nums transition " +
+          (off ? "bg-transparent text-[#c7c7cc] line-through ring-1 ring-black/10" : "bg-black text-white hover:bg-black/80");
+        b.textContent = fmtMin(m);
+        b.addEventListener("click", () => { off ? plan.excluded.delete(m) : plan.excluded.add(m); renderPreview(); });
+        box.appendChild(b);
+      });
+
+      const n = finalTimes().length, days = collectDates().length;
+      $("preview-count").textContent = `${n} időpont`;
+      $("plan-summary").textContent = n ? (days > 1 ? `${days} nap × ${n} időpont` : `${n} időpont erre a napra`) : "";
+    }
+
+    function planChanged() { plan.excluded.clear(); persistPlan(); renderPreview(); }
+
+    function renderBreaks() {
+      const box = $("break-list");
+      box.innerHTML = "";
+      if (!plan.breaks.length) {
+        box.innerHTML = `<p class="text-sm text-[#86868b]">Nincs szünet beállítva.</p>`;
+        return;
+      }
+      plan.breaks.forEach((br, i) => {
+        const row = document.createElement("div");
+        row.className = "flex flex-wrap items-center gap-2";
+        const f = document.createElement("div");
+        const t = document.createElement("div");
+        makeTimePicker(f, br.from, (v) => { br.from = v; planChanged(); });
+        makeTimePicker(t, br.to, (v) => { br.to = v; planChanged(); });
+        const dash = document.createElement("span"); dash.textContent = "–"; dash.className = "text-[#86868b]";
+        const x = document.createElement("button");
+        x.type = "button"; x.textContent = "✕"; x.setAttribute("aria-label", "Szünet törlése");
+        x.className = "ml-1 w-8 h-8 rounded-full text-[#86868b] hover:text-red-600 hover:bg-red-50 transition";
+        x.addEventListener("click", () => { plan.breaks.splice(i, 1); renderBreaks(); planChanged(); });
+        row.append(f, dash, t, x);
+        box.appendChild(row);
+      });
+    }
+
+    function renderWeekdayChips() {
+      const box = $("weekday-chips");
+      box.innerHTML = "";
+      WEEKDAYS.forEach((w) => {
+        const on = plan.repeatDays.has(w.d);
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "w-11 h-11 rounded-full text-sm font-medium transition " + (on ? "bg-black text-white" : "bg-[#f5f5f7] hover:bg-black/10");
+        b.textContent = w.l;
+        b.addEventListener("click", () => { on ? plan.repeatDays.delete(w.d) : plan.repeatDays.add(w.d); renderWeekdayChips(); renderPreview(); });
+        box.appendChild(b);
+      });
+    }
+
+    let qPicker = null;
+    function initSlotsUI() {
+      makeTimePicker($("p_open"), plan.open, (v) => { plan.open = v; planChanged(); });
+      makeTimePicker($("p_close"), plan.close, (v) => { plan.close = v; planChanged(); });
+      $("p_step").value = String(plan.step);
+      qPicker = makeTimePicker($("q_time"), 9 * 60);
+
+      const w = $("p_weeks"); w.innerHTML = "";
+      for (let i = 0; i <= 12; i++) {
+        const o = document.createElement("option");
+        o.value = i; o.textContent = i === 0 ? "Csak a kiválasztott nap" : `Ismétlés ${i} hétre előre`;
+        w.appendChild(o);
+      }
+
+      renderBreaks(); renderWeekdayChips(); renderPreview(); renderPlannerHeader();
+    }
+
+    $("p_step").addEventListener("input", (e) => {
+      const n = Math.floor(Number(e.target.value));
+      if (!Number.isFinite(n) || n < 5 || n > 480) return;   // gépelés közben nem ugrál
+      plan.step = n; planChanged();
+    });
+    $("p_step").addEventListener("change", (e) => { e.target.value = String(plan.step); });
+    $("p_weeks").addEventListener("change", (e) => { plan.weeks = Number(e.target.value); renderPreview(); });
+    $("add-break").addEventListener("click", () => { plan.breaks.push({ from: 12 * 60, to: 13 * 60 }); renderBreaks(); planChanged(); });
+    $("cal-prev").addEventListener("click", () => shiftMonth(-1));
+    $("cal-next").addEventListener("click", () => shiftMonth(1));
+
+    async function applyPlan(dates, times, mode) {
+      const dateSet = new Set(dates);
+      const lo = dates[0], hi = dates[dates.length - 1];
+
+      if (mode === "replace") {
+        const [s, b] = await Promise.all([
+          db.from("available_slots").select("id,slot_date,slot_time").gte("slot_date", lo).lte("slot_date", hi),
+          db.from("bookings").select("booking_date,booking_time").eq("status", "confirmed").gte("booking_date", lo).lte("booking_date", hi)
+        ]);
+        if (s.error) throw s.error;
+        if (b.error) throw b.error;
+        const booked = new Set(b.data.map((x) => x.booking_date + "|" + hm(x.booking_time)));
+        const ids = s.data.filter((x) => dateSet.has(x.slot_date) && !booked.has(x.slot_date + "|" + hm(x.slot_time))).map((x) => x.id);
+        for (const part of chunk(ids, 80)) {
+          const { error } = await db.from("available_slots").delete().in("id", part);
+          if (error) throw error;
+        }
+      }
+
+      const rows = [];
+      dates.forEach((d) => times.forEach((m) => rows.push({ slot_date: d, slot_time: fmtMin(m) })));
+      for (const part of chunk(rows, 400)) {
+        const { error } = await db.from("available_slots").upsert(part, { onConflict: "slot_date,slot_time", ignoreDuplicates: true });
+        if (error) throw error;
+      }
+      return rows.length;
+    }
+
+    $("plan-save").addEventListener("click", async () => {
+      if (busy) return;
+      if (isPast()) return toast("Múltbeli napra nem adható ki időpont.");
+      const times = finalTimes();
+      if (!times.length) return toast("Nincs mentendő időpont.");
+      const dates = collectDates();
+      const mode = document.querySelector('input[name="mode"]:checked').value;
+
+      if (mode === "replace" && !confirm(`A kiválasztott ${dates.length} nap szabad időpontjai lecserélődnek az újra. A lefoglalt időpontok megmaradnak. Folytatod?`)) return;
+
+      busy = true;
+      const btn = $("plan-save");
+      btn.disabled = true; btn.textContent = "Mentés…";
+      try {
+        await applyPlan(dates, times, mode);
+        toast(dates.length > 1 ? `${dates.length} nap beállítva` : "A nap időpontjai elmentve");
+        await loadSlots();
+      } catch (err) {
+        console.error(err);
+        toast("Hiba: " + (err.message || err));
+      } finally {
+        busy = false;
+        btn.textContent = "Időpontok mentése";
+        renderPlannerHeader();
+      }
+    });
+
+    /* =====================================================
+       FOGLALÁSOK
+       ===================================================== */
+    async function loadBookings() {
+      const { data, error } = await db.from("bookings").select("*").eq("status", "confirmed")
+        .gte("booking_date", todayStr()).order("booking_date").order("booking_time");
+      const box = $("booking-list");
+      if (error) { console.error(error); box.textContent = "Betöltési hiba."; return; }
+      if (!data.length) { box.innerHTML = `<p class="text-[#86868b]">Nincs közelgő foglalás.</p>`; return; }
+
+      box.innerHTML = "";
+      data.forEach((b) => {
+        const row = document.createElement("div");
+        row.className = "bg-white rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4";
+        row.innerHTML =
+          `<div>` +
+            `<p class="font-semibold">${esc(b.guest_name)}</p>` +
+            `<p class="text-sm text-[#6e6e73] capitalize">${esc(fmtDate(b.booking_date))}, ${esc(hm(b.booking_time))} · ${esc(b.service)}</p>` +
+            `<p class="text-sm mt-1"><a class="underline" href="tel:${esc(b.phone)}">${esc(b.phone)}</a> · <a class="underline" href="mailto:${esc(b.email)}">${esc(b.email)}</a></p>` +
+          `</div>` +
+          `<button data-cancel="${esc(b.id)}" class="rounded-full bg-red-50 text-red-700 px-4 py-2 text-sm font-medium hover:bg-red-100 transition">Lemondás</button>`;
+        box.appendChild(row);
+      });
+    }
+
+    $("booking-list").addEventListener("click", async (e) => {
+      const btn = e.target.closest("[data-cancel]");
+      if (!btn) return;
+      if (!confirm("Biztosan lemondod ezt a foglalást? Az időpont újra szabad lesz.")) return;
+      const { error } = await db.from("bookings").update({ status: "cancelled" }).eq("id", btn.dataset.cancel);
+      if (error) { console.error(error); return toast("Hiba: " + error.message); }
+      toast("Foglalás lemondva");
+      loadBookings(); loadSlots();
+    });
+
+    /* =====================================================
+       KÉPFELTÖLTÉS (közös)
+       ===================================================== */
+    async function toJpeg(file, max = 1800) {
+      try {
+        const bmp = await createImageBitmap(file);
+        const scale = Math.min(1, max / Math.max(bmp.width, bmp.height));
+        const w = Math.round(bmp.width * scale), h = Math.round(bmp.height * scale);
+        const c = document.createElement("canvas");
+        c.width = w; c.height = h;
+        const ctx = c.getContext("2d", { willReadFrequently: true });
+        ctx.drawImage(bmp, 0, 0, w, h);
+
+        // Átlátszó hátterű képnél (pl. PNG logó) megtartjuk az átlátszóságot,
+        // és levágjuk az üres szélét, így nem lesz fekete háttér és nem lesz benne felesleges margó.
+        if (/^image\/(png|webp|gif)$/.test(file.type)) {
+          const { data } = ctx.getImageData(0, 0, w, h);
+          let minX = w, minY = h, maxX = -1, maxY = -1, transparent = false;
+          for (let y = 0; y < h; y++) {
+            for (let x = 0; x < w; x++) {
+              const a = data[(y * w + x) * 4 + 3];
+              if (a < 250) transparent = true;
+              if (a > 8) {
+                if (x < minX) minX = x; if (x > maxX) maxX = x;
+                if (y < minY) minY = y; if (y > maxY) maxY = y;
+              }
+            }
+          }
+          if (transparent && maxX >= 0) {
+            const cw = maxX - minX + 1, ch = maxY - minY + 1;
+            const out = document.createElement("canvas");
+            out.width = cw; out.height = ch;
+            out.getContext("2d").drawImage(c, minX, minY, cw, ch, 0, 0, cw, ch);
+            const png = await new Promise((r) => out.toBlob(r, "image/png"));
+            if (png) return { blob: png, type: "image/png", ext: "png" };
+          }
+        }
+
+        const blob = await new Promise((r) => c.toBlob(r, "image/jpeg", 0.86));
+        if (blob) return { blob, type: "image/jpeg", ext: "jpg" };
+      } catch (_) { /* eredeti fájl feltöltése */ }
+      return { blob: file, type: file.type || "application/octet-stream", ext: (file.name.split(".").pop() || "jpg").toLowerCase() };
+    }
+    const rand = () => Math.random().toString(36).slice(2, 8);
+    const publicUrl = (path) => db.storage.from("gallery").getPublicUrl(path).data.publicUrl;
+
+    /* =====================================================
+       GALÉRIA
+       ===================================================== */
+    $("g_upload").addEventListener("click", async () => {
+      const files = [...$("g_files").files];
+      if (!files.length) return toast("Válassz ki képeket.");
+      const btn = $("g_upload"), status = $("g_status");
+      btn.disabled = true;
+      let ok = 0;
+      for (let i = 0; i < files.length; i++) {
+        status.textContent = `Feltöltés: ${i + 1} / ${files.length}…`;
+        const { blob, type, ext } = await toJpeg(files[i]);
+        const path = `${Date.now()}-${rand()}.${ext}`;
+        const up = await db.storage.from("gallery").upload(path, blob, { contentType: type });
+        if (up.error) { console.error(up.error); continue; }
+        const ins = await db.from("gallery_images").insert({ file_path: path });
+        if (ins.error) { console.error(ins.error); await db.storage.from("gallery").remove([path]); continue; }
+        ok++;
+      }
+      status.textContent = `${ok} / ${files.length} kép feltöltve.`;
+      $("g_files").value = "";
+      btn.disabled = false;
+      loadGallery();
+    });
+
+    async function loadGallery() {
+      const { data, error } = await db.from("gallery_images").select("*").order("created_at", { ascending: false });
+      const box = $("gallery-admin");
+      if (error) { console.error(error); box.textContent = "Betöltési hiba."; return; }
+      if (!data.length) { box.innerHTML = `<p class="col-span-full text-[#86868b]">Még nincs feltöltött kép.</p>`; return; }
+      box.innerHTML = "";
+      data.forEach((g) => {
+        const d = document.createElement("div");
+        d.className = "relative aspect-square rounded-2xl overflow-hidden bg-white";
+        d.innerHTML =
+          `<img src="${esc(publicUrl(g.file_path))}" alt="" class="w-full h-full object-cover" loading="lazy" />` +
+          `<button data-gdel="${esc(g.id)}" data-path="${esc(g.file_path)}" class="absolute top-2 right-2 rounded-full bg-black/70 text-white text-xs px-3 py-1.5 hover:bg-red-600 transition">Törlés</button>`;
+        box.appendChild(d);
+      });
+    }
+
+    $("gallery-admin").addEventListener("click", async (e) => {
+      const btn = e.target.closest("[data-gdel]");
+      if (!btn) return;
+      if (!confirm("Biztosan törlöd ezt a képet?")) return;
+      const { error } = await db.from("gallery_images").delete().eq("id", btn.dataset.gdel);
+      if (error) { console.error(error); return toast("Hiba: " + error.message); }
+      await db.storage.from("gallery").remove([btn.dataset.path]);
+      toast("Kép törölve");
+      loadGallery();
+    });
+
+    /* =====================================================
+       VÍZIÓ
+       ===================================================== */
+    const firstParagraph = (t) => (t || "").split(/\n\s*\n/)[0].trim();
+
+    /* ---- főoldali rész: rövid szöveg + kép ---- */
+    let vision = { title: "", teaser: "", image: "" };
+    let vPending = null;      // újonnan kiválasztott kép (még nincs feltöltve)
+    let vRemove = false;      // a meglévő képet törölni kell
+    let vPreviewUrl = null;
+
+    function paintVisionPreview() {
+      const box = $("v_preview");
+      if (vPreviewUrl) { URL.revokeObjectURL(vPreviewUrl); vPreviewUrl = null; }
+      let src = "";
+      if (vPending) { vPreviewUrl = URL.createObjectURL(vPending); src = vPreviewUrl; }
+      else if (vision.image && !vRemove) src = publicUrl(vision.image);
+
+      if (src) box.innerHTML = `<img src="${esc(src)}" alt="" class="w-full h-full object-contain" />`;
+      else box.textContent = "Nincs kép";
+    }
+
+    async function loadVision() {
+      const { data, error } = await db.from("site_content").select("key,value").in("key", ["vision_title", "vision_teaser", "vision_text", "vision_image"]);
+      if (error) { console.error(error); toast("A Vízió betöltése nem sikerült (futtattad az update_vision_v2.sql-t?)."); }
+      const v = Object.fromEntries((data || []).map((r) => [r.key, r.value || ""]));
+      vision = { title: v.vision_title || "Több mint hajvágás.", teaser: v.vision_teaser || firstParagraph(v.vision_text), image: v.vision_image || "" };
+      vPending = null; vRemove = false;
+      $("v_title").value = vision.title;
+      $("v_teaser").value = vision.teaser;
+      $("v_file").value = "";
+      paintVisionPreview();
+      loadVisionItems();
+    }
+
+    $("v_file").addEventListener("change", (e) => {
+      vPending = e.target.files[0] || null;
+      if (vPending) vRemove = false;
+      paintVisionPreview();
+    });
+    $("v_remove").addEventListener("click", () => {
+      vPending = null; vRemove = true; $("v_file").value = "";
+      paintVisionPreview();
+    });
+
+    $("v_save").addEventListener("click", async () => {
+      const btn = $("v_save");
+      btn.disabled = true; btn.textContent = "Mentés…";
+      let uploadedPath = null;
+      try {
+        const title = $("v_title").value.trim();
+        const teaser = $("v_teaser").value.trim();
+        let image = vision.image;
+        let oldToRemove = null;
+
+        if (vPending) {
+          const { blob, type, ext } = await toJpeg(vPending, 1600);
+          uploadedPath = `vision/${Date.now()}-${rand()}.${ext}`;
+          const up = await db.storage.from("gallery").upload(uploadedPath, blob, { contentType: type });
+          if (up.error) { uploadedPath = null; throw up.error; }
+          oldToRemove = vision.image || null;
+          image = uploadedPath;
+        } else if (vRemove) {
+          oldToRemove = vision.image || null;
+          image = "";
+        }
+
+        const { error } = await db.from("site_content").upsert([
+          { key: "vision_title", value: title },
+          { key: "vision_teaser", value: teaser },
+          { key: "vision_image", value: image }
+        ], { onConflict: "key" });
+        if (error) throw error;
+
+        if (oldToRemove) await db.storage.from("gallery").remove([oldToRemove]);
+        vision = { title, teaser, image };
+        vPending = null; vRemove = false; $("v_file").value = "";
+        paintVisionPreview();
+        toast("Főoldali rész elmentve");
+      } catch (err) {
+        console.error(err);
+        if (uploadedPath) await db.storage.from("gallery").remove([uploadedPath]);
+        toast("Hiba: " + (err.message || err));
+      } finally {
+        btn.disabled = false; btn.textContent = "Főoldali rész mentése";
+      }
+    });
+
+    /* ---- Vízió oldal: több kép + szöveg ---- */
+    let viItems = [];   // { id|null, image_path, body, sort_order, _file, _removeImage }
+
+    const newViDraft = () => ({ id: null, image_path: "", body: "", sort_order: 0, layout: "auto", _file: null, _removeImage: false });
+    const sortVi = () => viItems.sort((a, b) => {
+      if (!a.id !== !b.id) return a.id ? -1 : 1;          // mentettek elöl, piszkozatok a végén
+      return (a.sort_order - b.sort_order);
+    });
+
+    async function loadVisionItems() {
+      const { data, error } = await db.from("vision_items").select("*").order("sort_order").order("created_at");
+      const box = $("vi-list");
+      if (error) {
+        console.error(error);
+        box.innerHTML = `<p class="text-sm text-red-600">Nem sikerült betölteni. Futtattad az update_vision_v2.sql-t?</p>`;
+        return;
+      }
+      viItems = data.map((x) => ({ ...x, _file: null, _removeImage: false }));
+      renderViItems();
+    }
+
+    function renderViItems() {
+      const box = $("vi-list");
+      box.innerHTML = "";
+      if (!viItems.length) {
+        box.innerHTML = `<p class="text-sm text-[#86868b]">Még nincs elem. Kattints az „Új kép és szöveg" gombra.</p>`;
+        return;
+      }
+
+      viItems.forEach((it, idx) => {
+        const card = document.createElement("div");
+        card.className = "rounded-2xl border border-black/10 p-4 flex flex-col sm:flex-row gap-4";
+
+        // előnézet
+        const prev = document.createElement("div");
+        prev.className = "w-full sm:w-36 h-44 shrink-0 rounded-xl bg-[#f5f5f7] overflow-hidden flex items-center justify-center text-xs text-[#86868b]";
+        let objUrl = null;
+        const paintPrev = () => {
+          if (objUrl) { URL.revokeObjectURL(objUrl); objUrl = null; }
+          let src = "";
+          if (it._file) { objUrl = URL.createObjectURL(it._file); src = objUrl; }
+          else if (it.image_path && !it._removeImage) src = publicUrl(it.image_path);
+          if (src) prev.innerHTML = `<img src="${esc(src)}" alt="" class="w-full h-full object-cover" />`;
+          else prev.textContent = "Nincs kép";
+        };
+        paintPrev();
+
+        const right = document.createElement("div");
+        right.className = "flex-1 min-w-0 space-y-3";
+
+        const ta = document.createElement("textarea");
+        ta.rows = 4; ta.maxLength = 1500; ta.value = it.body || "";
+        ta.placeholder = "# Nagy cím\n\nSima szöveg, a **kulcsszavak** félkövérek.";
+        ta.className = "w-full rounded-xl bg-[#f5f5f7] px-3 py-2.5 outline-none text-sm ring-2 ring-transparent focus:ring-black/80 transition resize-y";
+        ta.addEventListener("input", () => { it.body = ta.value; });
+
+        const file = document.createElement("input");
+        file.type = "file"; file.accept = "image/*";
+        file.className = "block w-full text-xs file:mr-3 file:rounded-full file:border-0 file:bg-black file:text-white file:px-4 file:py-2 file:font-medium file:cursor-pointer";
+        file.addEventListener("change", () => {
+          it._file = file.files[0] || null;
+          if (it._file) it._removeImage = false;
+          paintPrev();
+        });
+
+        const row = document.createElement("div");
+        row.className = "flex flex-wrap items-center gap-2";
+
+        const mk = (label, cls, fn) => {
+          const b = document.createElement("button");
+          b.type = "button"; b.textContent = label; b.className = cls;
+          b.addEventListener("click", () => fn(b));
+          return b;
+        };
+
+        row.appendChild(mk("Mentés", "rounded-full bg-black text-white px-5 py-2 text-sm font-medium hover:bg-black/85 transition disabled:opacity-50", (b) => saveViItem(it, b)));
+        if (it.image_path || it._file) {
+          row.appendChild(mk("Kép eltávolítása", "text-sm text-[#6e6e73] hover:text-red-600 transition px-2", () => {
+            it._file = null; it._removeImage = true; file.value = ""; paintPrev();
+          }));
+        }
+        row.appendChild(mk("Törlés", "text-sm text-red-600 hover:underline px-2", () => deleteViItem(it)));
+
+        if (it.id) {
+          const mv = document.createElement("div");
+          mv.className = "ml-auto flex gap-1";
+          const up = mk("↑", "w-9 h-9 rounded-full bg-[#f5f5f7] hover:bg-black/10 transition disabled:opacity-30", () => moveViItem(idx, -1));
+          const dn = mk("↓", "w-9 h-9 rounded-full bg-[#f5f5f7] hover:bg-black/10 transition disabled:opacity-30", () => moveViItem(idx, 1));
+          up.disabled = idx === 0 || !viItems[idx - 1].id;
+          dn.disabled = idx === viItems.length - 1 || !viItems[idx + 1].id;
+          up.setAttribute("aria-label", "Feljebb"); dn.setAttribute("aria-label", "Lejjebb");
+          mv.append(up, dn);
+          row.appendChild(mv);
+        } else {
+          const tag = document.createElement("span");
+          tag.className = "ml-auto text-xs text-[#86868b]";
+          tag.textContent = "Még nincs elmentve";
+          row.appendChild(tag);
+        }
+
+        const lay = document.createElement("select");
+        lay.className = SELECT_CLS + " w-full";
+        [["auto", "Elrendezés: automatikus"], ["overlay", "Kép a szöveg mögött"], ["side", "Kép a szöveg mellett"], ["text", "Csak szöveg (nagy betűkkel)"]].forEach(([val, label]) => {
+          const o = document.createElement("option");
+          o.value = val; o.textContent = label;
+          lay.appendChild(o);
+        });
+        lay.value = it.layout || "auto";
+        lay.addEventListener("change", () => { it.layout = lay.value; });
+
+        right.append(ta, lay, file, row);
+        card.append(prev, right);
+        box.appendChild(card);
+      });
+    }
+
+    $("vi-add").addEventListener("click", () => {
+      viItems.push(newViDraft());
+      renderViItems();
+    });
+
+    async function saveViItem(it, btn) {
+      const body = (it.body || "").trim();
+      const hasImage = !!it._file || (it.image_path && !it._removeImage);
+      if (!body && !hasImage) return toast("Adj meg képet vagy szöveget.");
+
+      btn.disabled = true;
+      let uploaded = null;
+      try {
+        let image = it.image_path || "";
+        let old = null;
+
+        if (it._file) {
+          const { blob, type, ext } = await toJpeg(it._file, 1600);
+          uploaded = `vision/${Date.now()}-${rand()}.${ext}`;
+          const up = await db.storage.from("gallery").upload(uploaded, blob, { contentType: type });
+          if (up.error) { uploaded = null; throw up.error; }
+          old = it.image_path || null;
+          image = uploaded;
+        } else if (it._removeImage) {
+          old = it.image_path || null;
+          image = "";
+        }
+
+        let row;
+        if (it.id) {
+          const { data, error } = await db.from("vision_items").update({ image_path: image, body, layout: it.layout || "auto" }).eq("id", it.id).select().single();
+          if (error) throw error;
+          row = data;
+        } else {
+          const maxOrder = viItems.reduce((a, x) => Math.max(a, x.id ? (x.sort_order || 0) : 0), 0);
+          const { data, error } = await db.from("vision_items").insert({ image_path: image, body, layout: it.layout || "auto", sort_order: maxOrder + 1 }).select().single();
+          if (error) throw error;
+          row = data;
+        }
+
+        if (old) await db.storage.from("gallery").remove([old]);
+        Object.assign(it, row, { _file: null, _removeImage: false });
+        sortVi();
+        toast("Elmentve");
+        renderViItems();
+      } catch (err) {
+        console.error(err);
+        if (uploaded) await db.storage.from("gallery").remove([uploaded]);
+        toast("Hiba: " + (err.message || err));
+        btn.disabled = false;
+      }
+    }
+
+    async function deleteViItem(it) {
+      if (!confirm("Biztosan törlöd ezt az elemet?")) return;
+      if (it.id) {
+        const { error } = await db.from("vision_items").delete().eq("id", it.id);
+        if (error) { console.error(error); return toast("Hiba: " + error.message); }
+        if (it.image_path) await db.storage.from("gallery").remove([it.image_path]);
+      }
+      viItems = viItems.filter((x) => x !== it);
+      toast("Törölve");
+      renderViItems();
+    }
+
+    async function moveViItem(idx, dir) {
+      const a = viItems[idx], b = viItems[idx + dir];
+      if (!a || !b || !a.id || !b.id) return;
+      [viItems[idx], viItems[idx + dir]] = [viItems[idx + dir], viItems[idx]];
+
+      const changes = [];
+      viItems.forEach((x, i) => { if (x.id && x.sort_order !== i + 1) { x.sort_order = i + 1; changes.push(x); } });
+      renderViItems();
+
+      const results = await Promise.all(changes.map((x) => db.from("vision_items").update({ sort_order: x.sort_order }).eq("id", x.id)));
+      const failed = results.find((r) => r.error);
+      if (failed) { console.error(failed.error); toast("A sorrend mentése nem sikerült."); loadVisionItems(); }
+    }
+
+    /* =====================================================
+       ÉRTÉKELÉSEK
+       ===================================================== */
+    async function loadReviews() {
+      const { data, error } = await db.from("reviews").select("*").order("created_at", { ascending: false }).limit(200);
+      const box = $("review-admin");
+      if (error) { console.error(error); box.textContent = "Betöltési hiba."; return; }
+      if (!data.length) { box.innerHTML = `<p class="text-[#86868b]">Még nincs értékelés.</p>`; return; }
+      box.innerHTML = "";
+      data.forEach((r) => {
+        const row = document.createElement("div");
+        row.className = "bg-white rounded-2xl p-5 flex items-start justify-between gap-4";
+        row.innerHTML =
+          `<div>` +
+            `<p class="font-semibold">${esc(r.author_name)} <span class="text-amber-400 ml-2">${"★".repeat(r.rating)}${"☆".repeat(5 - r.rating)}</span></p>` +
+            `<p class="text-sm text-[#3a3a3c] mt-1 whitespace-pre-line">${esc(r.comment)}</p>` +
+            `<p class="text-xs text-[#86868b] mt-2">${esc(new Date(r.created_at).toLocaleString("hu-HU"))}</p>` +
+          `</div>` +
+          `<button data-rdel="${esc(r.id)}" class="shrink-0 rounded-full bg-red-50 text-red-700 px-4 py-2 text-sm font-medium hover:bg-red-100 transition">Törlés</button>`;
+        box.appendChild(row);
+      });
+    }
+
+    $("review-admin").addEventListener("click", async (e) => {
+      const btn = e.target.closest("[data-rdel]");
+      if (!btn) return;
+      if (!confirm("Biztosan törlöd ezt az értékelést?")) return;
+      const { error } = await db.from("reviews").delete().eq("id", btn.dataset.rdel);
+      if (error) { console.error(error); return toast("Hiba: " + error.message); }
+      toast("Értékelés törölve");
+      loadReviews();
+    });
+
+    /* =====================================================
+       BEÁLLÍTÁSOK: hajvágás ára
+       ===================================================== */
+    const fmtFt = (n) => Number(n).toLocaleString("hu-HU") + " Ft";
+
+    function paintPriceHint() {
+      const n = Math.floor(Number($("st_price").value));
+      $("st_price_hint").textContent = (Number.isFinite(n) && n > 0) ? `A weboldalon így látszik: Férfi hajvágás · ${fmtFt(n)}` : "";
+    }
+
+    async function loadSettings() {
+      const { data, error } = await db.from("site_content").select("value").eq("key", "service_price").maybeSingle();
+      if (error) { console.error(error); toast("Az ár betöltése nem sikerült."); }
+      const n = Math.floor(Number(data && data.value));
+      $("st_price").value = String(Number.isFinite(n) && n > 0 ? n : 5000);
+      paintPriceHint();
+    }
+
+    $("st_price").addEventListener("input", paintPriceHint);
+
+    $("st_save").addEventListener("click", async () => {
+      const n = Math.floor(Number($("st_price").value));
+      if (!Number.isFinite(n) || n < 1 || n > 1000000) return toast("Adj meg érvényes árat (pozitív egész szám).");
+      const btn = $("st_save");
+      btn.disabled = true; btn.textContent = "Mentés…";
+      try {
+        const { error } = await db.from("site_content").upsert([{ key: "service_price", value: String(n) }], { onConflict: "key" });
+        if (error) throw error;
+        $("st_price").value = String(n);
+        paintPriceHint();
+        toast("Ár elmentve: " + fmtFt(n));
+      } catch (err) {
+        console.error(err);
+        toast("Hiba: " + (err.message || err));
+      } finally {
+        btn.disabled = false; btn.textContent = "Ár mentése";
+      }
+    });
+
+    /* =====================================================
+       ADATKEZELŐ ADATAI
+       ===================================================== */
+    const OWNER_FIELDS = { owner_name: "ow_name", owner_address: "ow_address", owner_email: "ow_email", owner_phone: "ow_phone", owner_taxid: "ow_taxid" };
+
+    async function loadOwner() {
+      const { data, error } = await db.from("site_content").select("key,value").in("key", Object.keys(OWNER_FIELDS));
+      if (error) { console.error(error); return toast("Az adatkezelő adatainak betöltése nem sikerült."); }
+      const v = Object.fromEntries((data || []).map((r) => [r.key, r.value || ""]));
+      Object.entries(OWNER_FIELDS).forEach(([key, id]) => { $(id).value = v[key] || ""; });
+    }
+
+    $("ow_save").addEventListener("click", async () => {
+      const btn = $("ow_save");
+      btn.disabled = true; btn.textContent = "Mentés…";
+      try {
+        const rows = Object.entries(OWNER_FIELDS).map(([key, id]) => ({ key, value: $(id).value.trim() }));
+        const { error } = await db.from("site_content").upsert(rows, { onConflict: "key" });
+        if (error) throw error;
+        toast("Adatkezelő adatai elmentve");
+      } catch (err) {
+        console.error(err);
+        toast("Hiba: " + (err.message || err));
+      } finally {
+        btn.disabled = false; btn.textContent = "Adatok mentése";
+      }
+    });
+
+    /* =====================================================
+       ADATOK TÖRLÉSE (adatmegőrzés, törlési kérések)
+       ===================================================== */
+    const digits = (x) => String(x || "").replace(/\D/g, "");
+
+    $("purge-old").addEventListener("click", async () => {
+      const d = new Date();
+      d.setMonth(d.getMonth() - 12);
+      const cutoff = fmtISO(d);
+
+      const { count, error } = await db.from("bookings").select("id", { count: "exact", head: true }).lt("booking_date", cutoff);
+      if (error) { console.error(error); return toast("Hiba: " + error.message); }
+      if (!count) return toast("Nincs 12 hónapnál régebbi foglalás.");
+      if (!confirm(`${count} foglalás régebbi, mint ${cutoff}. Véglegesen törlöd őket?`)) return;
+
+      const del = await db.from("bookings").delete().lt("booking_date", cutoff);
+      if (del.error) { console.error(del.error); return toast("Hiba: " + del.error.message); }
+      toast(`${count} régi foglalás törölve`);
+    });
+
+    $("erase_btn").addEventListener("click", async () => {
+      const q = $("erase_q").value.trim();
+      const isEmail = q.includes("@");
+      const dq = digits(q);
+      if (isEmail ? q.length < 5 : dq.length < 7) return toast("Adj meg egy teljes e-mail címet vagy telefonszámot.");
+
+      const { data, error } = await db.from("bookings").select("id,guest_name,booking_date,booking_time,phone,email").limit(5000);
+      if (error) { console.error(error); return toast("Hiba: " + error.message); }
+
+      const hits = data.filter((b) => {
+        if (isEmail) return (b.email || "").toLowerCase() === q.toLowerCase();
+        // az utolsó 9 számjegyet hasonlítjuk, így a +36 30… és a 06 30… alak is egyezik
+        const dp = digits(b.phone);
+        return dp.length >= 7 && dp.slice(-9) === dq.slice(-9);
+      });
+      if (!hits.length) return toast("Nincs ilyen foglalás.");
+
+      const list = hits.slice(0, 10).map((b) => `${b.guest_name} – ${b.booking_date} ${hm(b.booking_time)}`).join("\n");
+      if (!confirm(`${hits.length} foglalás található:\n\n${list}${hits.length > 10 ? "\n…" : ""}\n\nVéglegesen törlöd mindet?`)) return;
+
+      for (const part of chunk(hits.map((h) => h.id), 80)) {
+        const del = await db.from("bookings").delete().in("id", part);
+        if (del.error) { console.error(del.error); return toast("Hiba: " + del.error.message); }
+      }
+      $("erase_q").value = "";
+      toast(`${hits.length} foglalás törölve`);
+      loadBookings(); loadSlots();
+    });
+  </script>
+</body>
+</html>

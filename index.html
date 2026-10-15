@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>kelenbarber – Időpontfoglalás</title>
+  <meta name="description" content="Férfi hajvágás – foglalj időpontot online." />
+
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+
+  <style>
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Inter, Roboto, Helvetica, Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Görgetésre alulról felfelé úszó elemek */
+    .reveal {
+      opacity: 0;
+      transform: translateY(70px);
+      transition: opacity 0.9s cubic-bezier(.16,1,.3,1), transform 0.9s cubic-bezier(.16,1,.3,1);
+      will-change: opacity, transform;
+    }
+    .reveal.in-view { opacity: 1; transform: none; }
+
+    /* Képek: beúszáskor finoman "ráfókuszál", rámutatáskor kicsit nagyít */
+    .img-reveal img {
+      transform: scale(1.12);
+      transition: transform 1.6s cubic-bezier(.16,1,.3,1);
+      will-change: transform;
+    }
+    .img-reveal.in-view img, .in-view .img-reveal img { transform: scale(1); }
+    .img-reveal.in-view:hover img, .in-view .img-reveal:hover img { transform: scale(1.05); transition-duration: .9s; }
+
+    /* Átlátszó "buborék" gomb (Megnézem) */
+    .bubble {
+      display: inline-flex; align-items: center; justify-content: center;
+      border-radius: 9999px; padding: .8rem 2rem;
+      font-size: 1rem; font-weight: 500; color: #1d1d1f;
+      background: rgba(0,0,0,.04);
+      border: 1px solid rgba(0,0,0,.12);
+      -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+      transition: background .3s, color .3s, border-color .3s, transform .3s;
+    }
+    .bubble:hover { background: #000; color: #fff; border-color: #000; transform: scale(1.03); }
+    .bubble:active { transform: scale(1); }
+
+    /* Sötét kártyás változat (Vízió, főoldal) */
+    .bubble-dark {
+      display: inline-flex; align-items: center; justify-content: center;
+      border-radius: 9999px; padding: 1rem 2.25rem;
+      font-size: .875rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+      color: #fff; background: rgba(255,255,255,.12);
+      border: 1px solid rgba(255,255,255,.35);
+      -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+      transition: background .3s, color .3s, border-color .3s, transform .3s;
+    }
+    .bubble-dark:hover { background: #fff; color: #000; border-color: #fff; transform: scale(1.03); }
+    .bubble-dark:active { transform: scale(1); }
+
+    #hero-content { will-change: opacity, transform; }
+
+    /* HERO háttér: tedd a képet az index.html mellé "hero.jpg" néven.
+       Ha nincs kép, a sötét átmenet marad. */
+    .hero-bg {
+      background-color: #0b0b0c;
+      background-image:
+        linear-gradient(to bottom, rgba(0,0,0,.55) 0%, rgba(0,0,0,.30) 40%, rgba(0,0,0,.80) 100%),
+        radial-gradient(60% 50% at 50% 38%, rgba(255,255,255,.10) 0%, rgba(255,255,255,0) 70%),
+        url("hero.jpg");
+      background-size: cover;
+      background-position: center;
+    }
+
+    /* Almenükön a felső sáv sötétebb, hogy a fehér háttéren is olvasható legyen */
+    body[data-page="gallery"] #site-nav,
+    body[data-page="vision"] #site-nav,
+    body[data-page="privacy"] #site-nav { background-color: rgba(10,10,10,.92) !important; }
+
+    input, select, textarea { -webkit-appearance: none; appearance: none; }
+    input[type="checkbox"] { -webkit-appearance: auto; appearance: auto; }
+
+    /* Mobilon a hero a látható magasságot kitölti (a böngésző címsora nem vág bele) */
+    #top { height: 100vh; height: 100svh; }
+
+    /* Adatkezelési tájékoztató szövegstílusa */
+    .pv { color: #3a3a3c; line-height: 1.7; }
+    .pv h2 { font-size: 1.35rem; font-weight: 600; letter-spacing: -.01em; color: #1d1d1f; margin: 2.5rem 0 .75rem; }
+    .pv h3 { font-size: 1.05rem; font-weight: 600; color: #1d1d1f; margin: 0 0 .5rem; }
+    .pv p { margin: 0 0 .75rem; }
+    .pv ul { list-style: disc; padding-left: 1.25rem; margin: 0 0 .75rem; }
+    .pv li { margin: .3rem 0; }
+    .pv .card { background: #f5f5f7; border-radius: 1.25rem; padding: 1.25rem 1.5rem; margin: .75rem 0 1.25rem; }
+    .pv a { text-decoration: underline; color: #1d1d1f; }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      .reveal { opacity: 1; transform: none; transition: none; }
+      .img-reveal img { transform: none; transition: none; }
+    }
+  </style>
+</head>
+
+<body data-page="home" class="bg-white text-[#1d1d1f] antialiased">
+
+  <!-- NAVIGÁCIÓ -->
+  <header id="site-nav" class="fixed top-0 inset-x-0 z-50 bg-black/50 backdrop-blur-xl border-b border-white/10">
+    <nav class="max-w-5xl mx-auto h-14 px-5 flex items-center justify-between text-[13px] text-white/80">
+      <a id="logo" href="#top" aria-label="kelenbarber – kezdőlap" class="block shrink-0">
+        <img src="kelengraf2.png" alt="kelenbarber" class="h-10 w-auto select-none" draggable="false" />
+      </a>
+      <div class="flex items-center gap-4 sm:gap-6">
+        <a href="#galeria" class="hover:text-white transition">Galéria</a>
+        <a id="nav-vision" href="#vizio" class="hidden hover:text-white transition">Vízió</a>
+        <a href="#ertekelesek" class="hover:text-white transition hidden sm:inline">Értékelések</a>
+        <a href="#foglalas" class="rounded-full bg-white text-black px-3.5 py-1 font-medium hover:bg-white/90 transition">Foglalás</a>
+      </div>
+    </nav>
+  </header>
+
+  <!-- ====================== FŐOLDAL ====================== -->
+  <div id="view-home">
+
+    <!-- HERO (sticky: a következő szekció ráúszik) -->
+    <section id="top" class="sticky top-0 z-0 hero-bg flex items-center justify-center overflow-hidden">
+      <div id="hero-content" class="relative text-center px-6">
+        <h1 class="text-5xl sm:text-8xl md:text-[9rem] font-semibold tracking-tight leading-[1.02] text-white">
+          <span class="bg-gradient-to-b from-white to-white/40 bg-clip-text text-transparent">kelenbarber</span>
+        </h1>
+        <a href="#foglalas"
+           class="inline-block mt-10 rounded-full bg-white text-black px-8 py-3.5 text-base font-medium hover:scale-[1.03] active:scale-100 transition">
+          Időpont foglalása
+        </a>
+      </div>
+
+      <div class="absolute bottom-8 left-1/2 -translate-x-1/2 text-white/50 text-xs tracking-widest animate-bounce">GÖRGESS ↓</div>
+    </section>
+
+    <!-- TARTALOM: ráúszik a hero-ra -->
+    <main class="relative z-10 bg-white rounded-t-[2.5rem] md:rounded-t-[4rem] shadow-[0_-40px_80px_rgba(0,0,0,.35)]">
+
+      <!-- GALÉRIA (csak az első 3 kép) -->
+      <section id="galeria" class="max-w-5xl mx-auto px-6 pt-28 md:pt-40 pb-24 md:pb-36">
+        <p class="reveal text-sm font-medium tracking-[0.25em] text-[#86868b] uppercase mb-10">Galéria</p>
+
+        <div id="gallery-grid" class="grid grid-cols-3 gap-2 md:gap-5"></div>
+        <p id="gallery-empty" class="hidden text-center text-[#86868b] py-16">Hamarosan itt lesznek a legújabb vágások.</p>
+
+        <div id="gallery-more" class="reveal hidden text-center mt-12 md:mt-16">
+          <a href="#/galeria" class="bubble">Megnézem</a>
+        </div>
+      </section>
+
+      <!-- VÍZIÓ (az admin oldalon szerkeszthető) -->
+      <section id="vizio" class="hidden max-w-5xl mx-auto px-6 pb-24 md:pb-36">
+        <p class="reveal text-sm font-medium tracking-[0.25em] text-[#86868b] uppercase mb-10">Vízió</p>
+
+        <div class="reveal rounded-[2rem] md:rounded-[2.5rem] bg-[#111111] text-white overflow-hidden">
+          <div id="vision-grid" class="grid md:grid-cols-2 gap-10 md:gap-14 items-center p-8 md:p-14">
+            <div>
+              <h2 id="vision-title" class="text-5xl md:text-7xl font-extrabold uppercase tracking-tight leading-[0.95]"></h2>
+              <div id="vision-more" class="hidden mt-8 md:mt-10">
+                <a href="#/vizio" class="bubble-dark">Megnézem</a>
+              </div>
+              <p id="vision-text" class="mt-8 text-base md:text-lg leading-relaxed text-white/70 whitespace-pre-line"></p>
+            </div>
+            <div id="vision-image-wrap" class="flex items-center justify-center">
+              <img id="vision-img" src="" alt="Vízió" class="max-w-full max-h-[26rem] md:max-h-[34rem] w-auto h-auto rounded-3xl select-none" loading="lazy" draggable="false" />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- FOGLALÁS -->
+      <section id="foglalas" class="bg-[#f5f5f7] rounded-t-[2.5rem] md:rounded-t-[4rem] px-6 py-24 md:py-36">
+        <div class="max-w-xl mx-auto">
+          <p class="reveal text-sm font-medium tracking-[0.25em] text-[#86868b] uppercase mb-4 text-center">Időpontfoglalás</p>
+          <h2 class="reveal text-4xl md:text-6xl font-semibold tracking-tight text-center leading-tight mb-6">
+            Foglalj most.
+          </h2>
+          <p class="reveal text-center mb-14">
+            <span id="price-pill" class="invisible inline-block rounded-full bg-black text-white px-5 py-2 text-sm font-medium"></span>
+          </p>
+
+          <form id="booking-form" class="reveal bg-white rounded-3xl p-6 md:p-10 shadow-[0_20px_60px_rgba(0,0,0,.06)] space-y-5" novalidate>
+
+            <div>
+              <label for="guest_name" class="block text-sm font-medium mb-2">Vendég neve</label>
+              <input id="guest_name" name="guest_name" type="text" required autocomplete="name" placeholder="Kovács János"
+                     class="w-full rounded-2xl bg-[#f5f5f7] px-4 py-3.5 outline-none ring-2 ring-transparent focus:ring-black/80 transition" />
+            </div>
+
+            <div>
+              <label for="phone" class="block text-sm font-medium mb-2">Telefonszám</label>
+              <input id="phone" name="phone" type="tel" required autocomplete="tel" placeholder="+36 30 123 4567"
+                     class="w-full rounded-2xl bg-[#f5f5f7] px-4 py-3.5 outline-none ring-2 ring-transparent focus:ring-black/80 transition" />
+            </div>
+
+            <div>
+              <label for="email" class="block text-sm font-medium mb-2">E-mail cím</label>
+              <input id="email" name="email" type="email" required autocomplete="email" placeholder="janos@example.com"
+                     class="w-full rounded-2xl bg-[#f5f5f7] px-4 py-3.5 outline-none ring-2 ring-transparent focus:ring-black/80 transition" />
+            </div>
+
+            <!-- Szabad időpontok (az admin adja ki) -->
+            <div>
+              <span class="block text-sm font-medium mb-2">Válassz időpontot</span>
+              <p id="slots-loading" class="text-sm text-[#6e6e73]">Időpontok betöltése…</p>
+              <p id="slots-empty" class="hidden rounded-2xl bg-[#f5f5f7] px-4 py-4 text-sm text-[#6e6e73]"></p>
+              <div id="date-chips" class="flex gap-2 overflow-x-auto pb-2"></div>
+              <div id="time-chips" class="flex flex-wrap gap-2 mt-3"></div>
+            </div>
+
+            <label class="flex items-start gap-3 text-sm text-[#6e6e73] cursor-pointer">
+              <input id="accept_privacy" type="checkbox" class="mt-0.5 h-5 w-5 shrink-0 cursor-pointer accent-black" />
+              <span>Elolvastam és elfogadom az <a href="#/adatvedelem" class="underline text-[#1d1d1f]">adatkezelési tájékoztatót</a>.</span>
+            </label>
+
+            <div id="form-error" role="alert" class="hidden rounded-2xl bg-red-50 text-red-700 px-4 py-3 text-sm"></div>
+
+            <button id="submit-btn" type="submit"
+                    class="w-full rounded-full bg-black text-white py-4 text-base font-medium hover:bg-black/85 active:scale-[0.99] transition disabled:opacity-50 disabled:cursor-not-allowed">
+              Időpont lefoglalása
+            </button>
+          </form>
+
+          <!-- Sikeres foglalás -->
+          <div id="success-box" class="hidden mt-6 rounded-3xl bg-white p-8 text-center shadow-[0_20px_60px_rgba(0,0,0,.06)]" role="status">
+            <div class="mx-auto mb-4 w-14 h-14 rounded-full bg-green-100 flex items-center justify-center">
+              <svg class="w-7 h-7 text-green-600" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+            </div>
+            <h3 class="text-2xl font-semibold tracking-tight mb-2">Sikeres foglalás!</h3>
+            <p id="success-text" class="text-[#6e6e73]"></p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ÉRTÉKELÉSEK -->
+      <div class="bg-[#f5f5f7]">
+        <section id="ertekelesek" class="bg-white rounded-t-[2.5rem] md:rounded-t-[4rem] px-6 py-24 md:py-36">
+          <div class="max-w-3xl mx-auto">
+            <p class="reveal text-sm font-medium tracking-[0.25em] text-[#86868b] uppercase mb-4">Értékelések</p>
+            <h2 class="reveal text-4xl md:text-6xl font-semibold tracking-tight leading-tight mb-6">
+              Mit mondanak<br /><span class="text-[#86868b]">a vendégek?</span>
+            </h2>
+            <p id="rating-summary" class="reveal text-lg text-[#6e6e73] mb-12 md:mb-16"></p>
+
+            <div id="review-list" class="space-y-4 mb-20"></div>
+
+            <!-- Értékelés írása -->
+            <form id="review-form" class="reveal rounded-3xl bg-[#f5f5f7] p-6 md:p-10 space-y-5" novalidate>
+              <h3 class="text-2xl font-semibold tracking-tight">Írj értékelést</h3>
+
+              <div>
+                <label for="r_name" class="block text-sm font-medium mb-2">Neved</label>
+                <input id="r_name" type="text" maxlength="60" autocomplete="name" placeholder="Pl. János"
+                       class="w-full rounded-2xl bg-white px-4 py-3.5 outline-none ring-2 ring-transparent focus:ring-black/80 transition" />
+              </div>
+
+              <div>
+                <span class="block text-sm font-medium mb-2">Értékelés</span>
+                <div id="star-input" class="flex gap-1" role="radiogroup" aria-label="Csillagok"></div>
+              </div>
+
+              <div>
+                <label for="r_comment" class="block text-sm font-medium mb-2">Vélemény</label>
+                <textarea id="r_comment" rows="4" maxlength="500" placeholder="Hogy tetszett a vágás?"
+                          class="w-full rounded-2xl bg-white px-4 py-3.5 outline-none ring-2 ring-transparent focus:ring-black/80 transition resize-none"></textarea>
+              </div>
+
+              <!-- Spam-csapda: emberek nem látják -->
+              <input id="r_website" type="text" tabindex="-1" autocomplete="off" class="hidden" aria-hidden="true" />
+
+              <label class="flex items-start gap-3 text-sm text-[#6e6e73] cursor-pointer">
+                <input id="accept_review" type="checkbox" class="mt-0.5 h-5 w-5 shrink-0 cursor-pointer accent-black" />
+                <span>Hozzájárulok, hogy a nevem és az értékelésem nyilvánosan megjelenjen a weboldalon. Az <a href="#/adatvedelem" class="underline text-[#1d1d1f]">adatkezelési tájékoztatót</a> elolvastam.</span>
+              </label>
+
+              <div id="review-msg" role="status" class="hidden rounded-2xl px-4 py-3 text-sm"></div>
+
+              <button id="review-btn" type="submit"
+                      class="w-full rounded-full bg-black text-white py-4 text-base font-medium hover:bg-black/85 active:scale-[0.99] transition disabled:opacity-50 disabled:cursor-not-allowed">
+                Értékelés beküldése
+              </button>
+            </form>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <!-- ====================== GALÉRIA OLDAL (az összes kép) ====================== -->
+  <div id="view-gallery" class="hidden relative z-10 bg-white min-h-[75vh]">
+    <div class="max-w-5xl mx-auto px-6 pt-28 md:pt-36 pb-24 md:pb-32">
+      <a href="#galeria" class="inline-flex items-center gap-2 text-sm text-[#86868b] hover:text-black transition mb-10">← Vissza</a>
+      <p class="reveal text-sm font-medium tracking-[0.25em] text-[#86868b] uppercase mb-10">Galéria</p>
+
+      <div id="gallery-all" class="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-5"></div>
+      <p id="gallery-all-empty" class="hidden text-center text-[#86868b] py-16">Hamarosan itt lesznek a legújabb vágások.</p>
+    </div>
+  </div>
+
+  <!-- ====================== VÍZIÓ OLDAL (történet) ====================== -->
+  <div id="view-vision" class="hidden relative z-10 bg-white min-h-[75vh]">
+    <div class="max-w-5xl mx-auto px-6 pt-28 md:pt-36 pb-24 md:pb-32">
+      <a href="#vizio" class="inline-flex items-center gap-2 text-sm text-[#86868b] hover:text-black transition mb-10">← Vissza</a>
+      <h1 class="reveal text-5xl md:text-7xl font-semibold tracking-tight leading-none mb-5">Vízió</h1>
+      <p class="reveal text-sm font-medium tracking-[0.25em] text-[#86868b] uppercase mb-14 md:mb-20">Történet</p>
+
+      <div id="vision-items" class="space-y-24 md:space-y-40"></div>
+      <p id="vision-items-empty" class="hidden text-center text-[#86868b] py-16">Hamarosan több is kiderül.</p>
+    </div>
+  </div>
+
+  <!-- ====================== ADATKEZELÉSI TÁJÉKOZTATÓ ====================== -->
+  <div id="view-privacy" class="hidden relative z-10 bg-white min-h-[75vh]">
+    <div class="max-w-3xl mx-auto px-6 pt-28 md:pt-36 pb-24 md:pb-32">
+      <a id="privacy-back" href="#top" class="inline-flex items-center gap-2 text-sm text-[#86868b] hover:text-black transition mb-10">← Vissza</a>
+      <h1 class="text-4xl md:text-6xl font-semibold tracking-tight leading-tight mb-4">Adatkezelési tájékoztató</h1>
+      <p class="text-sm text-[#86868b] mb-10">Hatályos: 2026. október 15.</p>
+
+      <div class="pv">
+        <p>Ez a tájékoztató bemutatja, hogyan kezeljük a személyes adataidat, amikor ezen a weboldalon időpontot foglalsz vagy értékelést írsz. Az adatkezelés az Európai Parlament és a Tanács (EU) 2016/679 rendelete (GDPR) és az információs önrendelkezési jogról és az információszabadságról szóló 2011. évi CXII. törvény szerint történik.</p>
+
+        <h2>1. Az adatkezelő</h2>
+        <ul>
+          <li><strong>Név:</strong> <span id="pv-name"></span></li>
+          <li><strong>Cím:</strong> <span id="pv-address"></span></li>
+          <li><strong>E-mail:</strong> <span class="pv-email"></span></li>
+          <li><strong>Telefon:</strong> <span id="pv-phone"></span></li>
+          <li id="pv-taxid-row" class="hidden"><strong>Adószám / nyilvántartási szám:</strong> <span id="pv-taxid"></span></li>
+        </ul>
+
+        <h2>2. Milyen adatokat kezelünk, miért és meddig</h2>
+
+        <div class="card">
+          <h3>Időpontfoglalás</h3>
+          <ul>
+            <li><strong>Kezelt adatok:</strong> név, telefonszám, e-mail cím, a választott szolgáltatás, a foglalt időpont (dátum és idő), a foglalás állapota (megerősített vagy lemondott) és a foglalás rögzítésének ideje.</li>
+            <li><strong>Cél:</strong> az időpont lefoglalása és nyilvántartása, a szolgáltatás nyújtása, valamint kapcsolatfelvétel a foglalással kapcsolatban (például lemondás vagy változás esetén).</li>
+            <li><strong>Jogalap:</strong> GDPR 6. cikk (1) bekezdés b) pont, vagyis a szerződés megkötését megelőzően az érintett kérésére történő lépések megtétele.</li>
+            <li><strong>Megőrzés:</strong> a foglalt időpontot követő legfeljebb 12 hónapig, ezután töröljük.</li>
+          </ul>
+          <p>Az adatok megadása a foglalás feltétele: ezek nélkül az időpont nem foglalható le.</p>
+        </div>
+
+        <div class="card">
+          <h3>Értékelés írása</h3>
+          <ul>
+            <li><strong>Kezelt adatok:</strong> az általad megadott név, a csillagos értékelés, a szöveges vélemény és a beküldés ideje. Nem kell a teljes nevedet megadnod, becenevet is használhatsz.</li>
+            <li><strong>Cél:</strong> a vendégek véleményének megjelenítése a weboldalon.</li>
+            <li><strong>Jogalap:</strong> a hozzájárulásod, GDPR 6. cikk (1) bekezdés a) pont. A hozzájárulást bármikor visszavonhatod, ez nem érinti a visszavonás előtti adatkezelés jogszerűségét.</li>
+            <li><strong>Megőrzés:</strong> a hozzájárulásod visszavonásáig, vagyis amíg törlést nem kérsz.</li>
+          </ul>
+          <p>Az értékelés nyilvános, a weboldal bármely látogatója láthatja.</p>
+        </div>
+
+        <div class="card">
+          <h3>Technikai adatok</h3>
+          <p>Az oldal tárhelyét a GitHub (GitHub Pages) biztosítja, a működéshez szükséges szkripteket külső tartalomszolgáltatók (cdn.tailwindcss.com és cdn.jsdelivr.net) szolgálják ki, az adatbázist pedig a Supabase üzemelteti. Ezek a szolgáltatók a böngésződ technikai adatait (például IP-cím, böngésző típusa, a kérés ideje) saját naplóikban rögzíthetik. Ezekhez az adatokhoz nem férünk hozzá, kezelésükre az adott szolgáltató saját szabályai vonatkoznak.</p>
+        </div>
+
+        <h2>3. Kik férnek hozzá az adataidhoz</h2>
+        <ul>
+          <li>A foglalási adataidhoz csak az adatkezelő fér hozzá, jelszóval védett felületen keresztül. Az adatbázis úgy van beállítva, hogy a weboldal látogatói mások foglalási adatait nem láthatják.</li>
+          <li><strong>Supabase (Supabase Inc.):</strong> az adatbázis és a képtároló szolgáltatója, adatfeldolgozóként tárolja a foglalásokat, az értékeléseket és a feltöltött képeket.</li>
+          <li><strong>GitHub (GitHub, Inc.):</strong> az oldal kiszolgálását végzi.</li>
+          <li>Az említett szolgáltatók az Európai Gazdasági Térségen kívül, például az Egyesült Államokban is kezelhetnek adatokat. Az adattovábbítás az adott szolgáltató által alkalmazott megfelelő garanciák (például általános szerződési feltételek) mellett történik.</li>
+          <li>Az adataidat nem adjuk el, marketing célra nem használjuk, hírlevelet nem küldünk, automatizált döntéshozatalt és profilalkotást nem végzünk.</li>
+        </ul>
+
+        <h2>4. Sütik és követés</h2>
+        <p>Az oldal nem használ nyomkövető, analitikai vagy marketing sütiket, és nem tölt be követőszkripteket (például Google Analytics). Az oldalon található Instagram hivatkozás külső oldalra visz, ahol az Instagram saját adatkezelési szabályai érvényesek.</p>
+
+        <h2>5. Milyen jogaid vannak</h2>
+        <ul>
+          <li>tájékoztatást kérhetsz arról, hogy kezeljük-e az adataidat, és hozzáférhetsz hozzájuk;</li>
+          <li>kérheted a pontatlan adatok helyesbítését;</li>
+          <li>kérheted az adataid törlését;</li>
+          <li>kérheted az adatkezelés korlátozását;</li>
+          <li>élhetsz az adathordozhatóság jogával a foglalási adataid esetén;</li>
+          <li>a hozzájáruláson alapuló adatkezelés (értékelés) esetén bármikor visszavonhatod a hozzájárulásod.</li>
+        </ul>
+        <p>Kérésedet küldd el az adatkezelő fenti e-mail címére (<span class="pv-email"></span>). Legfeljebb egy hónapon belül válaszolunk.</p>
+
+        <h2>6. Jogorvoslat</h2>
+        <p>Ha úgy érzed, hogy az adataid kezelése sérti a jogaidat, panasszal fordulhatsz a Nemzeti Adatvédelmi és Információszabadság Hatósághoz (NAIH, honlap: <a href="https://naih.hu" target="_blank" rel="noopener noreferrer">naih.hu</a>, e-mail: <a href="mailto:ugyfelszolgalat@naih.hu">ugyfelszolgalat@naih.hu</a>), vagy bírósághoz fordulhatsz.</p>
+
+        <h2>7. Adatbiztonság</h2>
+        <p>Az oldal titkosított (HTTPS) kapcsolaton keresztül érhető el, az adatok tárolása jelszóval védett, korlátozott hozzáférésű rendszerben történik.</p>
+
+        <h2>8. A tájékoztató módosítása</h2>
+        <p>A tájékoztatót módosíthatjuk. A mindenkor hatályos változat ezen az oldalon érhető el.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- LÁBLÉC (minden oldalon) -->
+  <footer class="relative z-10 bg-white border-t border-black/10 px-6 py-12 text-center text-sm text-[#86868b]">
+    <a href="https://www.instagram.com/kelenbarber/" target="_blank" rel="noopener noreferrer"
+       aria-label="kelenbarber az Instagramon" title="@kelenbarber"
+       class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[#f5f5f7] text-[#1d1d1f] hover:bg-black hover:text-white hover:scale-105 transition mb-6">
+      <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="3" y="3" width="18" height="18" rx="5"></rect>
+        <circle cx="12" cy="12" r="4.2"></circle>
+        <circle cx="17.3" cy="6.7" r="1" fill="currentColor" stroke="none"></circle>
+      </svg>
+    </a>
+    <p>© <span id="year"></span> kelenbarber · <a href="#/adatvedelem" class="underline hover:text-black transition">Adatkezelési tájékoztató</a></p>
+  </footer>
+
+  <script>
+    /* ================= BEÁLLÍTÁSOK ================= */
+    const SUPABASE_URL = "https://mvypsplzbmcucytfeaav.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im12eXBzcGx6Ym1jdWN5dGZlYWF2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE5MDg1NDIsImV4cCI6MjEwNzQ4NDU0Mn0.E-EBAkhzoFoudMnmcD_02btv6VQcfiR3yX2ofuPOEaQ";
+
+    const SERVICE_NAME = "Férfi hajvágás";
+    let PRICE = 5000;   // alapérték; az admin oldalon módosítható
+
+    const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    /* ================= SEGÉDFÜGGVÉNYEK ================= */
+    const $ = (id) => document.getElementById(id);
+    const pad = (n) => String(n).padStart(2, "0");
+    const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    const parseDate = (s) => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
+    const hm = (t) => t.slice(0, 5);
+    const publicUrl = (path) => db.storage.from("gallery").getPublicUrl(path).data.publicUrl;
+
+    function renderPrice() {
+      const pill = $("price-pill");
+      pill.textContent = `${SERVICE_NAME} · ${PRICE.toLocaleString("hu-HU")} Ft`;
+      pill.classList.remove("invisible");
+    }
+    async function loadPrice() {
+      try {
+        const { data, error } = await db.from("site_content").select("value").eq("key", "service_price").maybeSingle();
+        if (error) console.error(error);
+        const n = Math.floor(Number(data && data.value));
+        if (Number.isFinite(n) && n > 0) PRICE = n;
+      } catch (e) { console.error(e); }
+      renderPrice();
+    }
+    $("year").textContent = new Date().getFullYear();
+
+    /* ================= GÖRGETÉS ANIMÁCIÓK ================= */
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((en) => {
+        if (en.isIntersecting) { en.target.classList.add("in-view"); io.unobserve(en.target); }
+      });
+    }, { threshold: 0.12, rootMargin: "0px 0px -6% 0px" });
+    const watch = (el) => io.observe(el);
+    document.querySelectorAll(".reveal").forEach(watch);
+
+    const heroContent = $("hero-content");
+    let ticking = false;
+    window.addEventListener("scroll", () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        const p = Math.min(window.scrollY / window.innerHeight, 1);
+        heroContent.style.opacity = String(Math.max(1 - p * 1.4, 0));
+        heroContent.style.transform = `translateY(${-p * 60}px) scale(${1 - p * 0.06})`;
+        ticking = false;
+      });
+    }, { passive: true });
+
+    /* ================= OLDALAK (főoldal / galéria / vízió) ================= */
+    // #/galeria  -> összes kép,  #/vizio -> történet,  minden más -> főoldal
+    if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+
+    let currentPage = null;
+    let inSiteNav = false;
+    let homeScrollY = 0;
+    const jump = (y) => window.scrollTo({ top: y, behavior: "instant" });
+
+    function route() {
+      const h = location.hash;
+      const next = h === "#/galeria" ? "gallery" : h === "#/vizio" ? "vision" : h === "#/adatvedelem" ? "privacy" : "home";
+      if (next === currentPage) return;
+
+      if (currentPage === "home") homeScrollY = window.scrollY;
+      ["home", "gallery", "vision", "privacy"].forEach((p) => $("view-" + p).classList.toggle("hidden", p !== next));
+      document.body.dataset.page = next;
+
+      const prev = currentPage;
+      currentPage = next;
+      if (prev) inSiteNav = true;
+
+      if (next !== "home") { jump(0); return; }
+      if (!prev) return;                       // első betöltés: a böngésző kezeli a horgonyt
+
+      // visszatérés almenüből a főoldalra
+      const id = h.slice(1);
+      const target = id && id !== "top" ? document.getElementById(id) : null;
+      if (target) target.scrollIntoView({ behavior: "instant" });
+      else if (id === "top") jump(0);
+      else jump(homeScrollY);
+    }
+    window.addEventListener("hashchange", route);
+
+    // Adatkezelési tájékoztató: a Vissza gomb oda visz, ahonnan jöttél (az űrlap kitöltve marad)
+    $("privacy-back").addEventListener("click", (e) => {
+      e.preventDefault();
+      if (inSiteNav) { history.back(); return; }
+      homeScrollY = 0;
+      history.pushState(null, "", location.pathname + location.search);
+      route();
+    });
+
+    // Logó: mindig a főoldal legtetejére visz
+    $("logo").addEventListener("click", (e) => {
+      e.preventDefault();
+      const clean = location.pathname + location.search;
+      if (currentPage === "home") {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        if (location.hash) history.replaceState(null, "", clean);
+      } else {
+        homeScrollY = 0;
+        history.pushState(null, "", clean);
+        route();
+      }
+    });
+
+    /* ================= GALÉRIA ================= */
+    function galleryTile(url, i) {
+      const d = document.createElement("div");
+      d.className = "reveal group relative overflow-hidden rounded-xl md:rounded-3xl bg-[#f5f5f7] aspect-square";
+      d.style.transitionDelay = ((i % 3) * 80) + "ms";
+      const img = document.createElement("img");
+      img.src = url; img.alt = "Hajvágás – kelenbarber"; img.loading = "lazy"; img.draggable = false;
+      img.className = "w-full h-full object-cover select-none transition duration-700 group-hover:scale-105";
+      d.appendChild(img);
+      return d;
+    }
+
+    async function loadGallery() {
+      const { data, error } = await db.from("gallery_images").select("file_path").order("created_at", { ascending: false });
+      if (error || !data || !data.length) {
+        if (error) console.error(error);
+        $("gallery-empty").classList.remove("hidden");
+        $("gallery-all-empty").classList.remove("hidden");
+        return;
+      }
+      const urls = data.map((g) => publicUrl(g.file_path));
+
+      // főoldal: csak az első 3 kép
+      urls.slice(0, 3).forEach((u, i) => { const t = galleryTile(u, i); $("gallery-grid").appendChild(t); watch(t); });
+      // galéria oldal: az összes
+      urls.forEach((u, i) => { const t = galleryTile(u, i); $("gallery-all").appendChild(t); watch(t); });
+
+      if (urls.length > 3) $("gallery-more").classList.remove("hidden");
+    }
+
+    /* ================= VÍZIÓ ================= */
+    const firstParagraph = (t) => (t || "").split(/\n\s*\n/)[0].trim();
+
+    // **félkövér** jelölés biztonságos kirajzolása (HTML-t nem engedünk be)
+    function inline(el, str, strongCls) {
+      String(str || "").split(/(\*\*[^*]+\*\*)/g).forEach((part) => {
+        if (/^\*\*[^*]+\*\*$/.test(part)) {
+          const b = document.createElement("strong");
+          b.className = strongCls;
+          b.textContent = part.slice(2, -2);
+          el.appendChild(b);
+        } else if (part) {
+          el.appendChild(document.createTextNode(part));
+        }
+      });
+    }
+
+    // Blokk szöveg: "# nagy cím", "## kisebb cím", üres sor = új bekezdés, **kulcsszó** = félkövér
+    function richText(text, st) {
+      const frag = document.createDocumentFragment();
+      String(text || "").split(/\n\s*\n/).map((x) => x.trim()).filter(Boolean).forEach((block) => {
+        let tag = "p", cls = st.p, body = block;
+        if (/^##\s/.test(block)) { tag = "h3"; cls = st.h2; body = block.replace(/^##\s+/, ""); }
+        else if (/^#\s/.test(block)) { tag = "h2"; cls = st.h1; body = block.replace(/^#\s+/, ""); }
+        const el = document.createElement(tag);
+        el.className = cls + " whitespace-pre-line";
+        inline(el, body, st.strong);
+        frag.appendChild(el);
+      });
+      return frag;
+    }
+
+    // Méretek és színek elrendezésenként: nem minden szöveg egyforma, a kulcsszavak kiemelve
+    const ST = {
+      overlay: {
+        h1: "text-4xl md:text-7xl font-semibold tracking-tight leading-[1.04] text-white",
+        h2: "text-2xl md:text-4xl font-semibold tracking-tight leading-tight text-white",
+        p: "text-lg md:text-2xl leading-snug text-white/70",
+        strong: "font-semibold text-white"
+      },
+      side: {
+        h1: "text-3xl md:text-5xl font-semibold tracking-tight leading-[1.08] text-[#1d1d1f]",
+        h2: "text-xl md:text-3xl font-semibold tracking-tight leading-tight text-[#1d1d1f]",
+        p: "text-lg md:text-xl leading-relaxed text-[#6e6e73]",
+        strong: "font-semibold text-[#1d1d1f]"
+      },
+      text: {
+        h1: "text-4xl md:text-7xl font-semibold tracking-tight leading-[1.04] text-[#1d1d1f]",
+        h2: "text-2xl md:text-4xl font-semibold tracking-tight leading-tight text-[#1d1d1f]",
+        p: "text-2xl md:text-4xl font-semibold tracking-tight leading-snug text-[#86868b]",
+        strong: "text-[#1d1d1f]"
+      }
+    };
+
+    const mkDiv = (cls) => { const d = document.createElement("div"); d.className = cls; return d; };
+    function mkImg(path, cls) {
+      const img = document.createElement("img");
+      img.src = publicUrl(path); img.alt = ""; img.loading = "lazy"; img.draggable = false;
+      img.className = cls + " select-none";
+      return img;
+    }
+
+    function ctaButton() {
+      const d = mkDiv("pt-4");
+      const a = document.createElement("a");
+      a.href = "#foglalas";
+      a.className = "inline-flex items-center rounded-full bg-black text-white px-8 py-3.5 text-base font-medium hover:scale-[1.03] active:scale-100 transition";
+      a.textContent = "Időpont foglalása";
+      d.appendChild(a);
+      return d;
+    }
+
+    // 1) a kép a szöveg mögött
+    function buildOverlay(item) {
+      const wrap = mkDiv("reveal img-reveal relative overflow-hidden rounded-[2rem] md:rounded-[3rem] bg-[#111111] min-h-[30rem] md:min-h-[42rem] flex items-end");
+      wrap.appendChild(mkImg(item.image_path, "absolute inset-0 w-full h-full object-cover"));
+      wrap.appendChild(mkDiv("absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-black/10"));
+      const body = mkDiv("relative p-8 md:p-16 max-w-3xl space-y-5 md:space-y-6");
+      body.appendChild(richText(item.body, ST.overlay));
+      wrap.appendChild(body);
+      return wrap;
+    }
+
+    // 2) kép és szöveg egymás mellett (váltakozó oldalon)
+    function buildSide(item, flip) {
+      const hasBody = !!(item.body || "").trim();
+      const imgWrap = mkDiv("reveal img-reveal rounded-3xl overflow-hidden bg-[#f5f5f7] " + (hasBody ? "aspect-[4/5]" : "aspect-[16/10]") + (flip ? " md:order-2" : ""));
+      imgWrap.appendChild(mkImg(item.image_path, "w-full h-full object-cover"));
+      if (!hasBody) return imgWrap;
+
+      const row = mkDiv("grid md:grid-cols-2 gap-8 md:gap-16 items-center");
+      const txt = mkDiv("reveal space-y-4 md:space-y-5");
+      txt.style.transitionDelay = "120ms";
+      txt.appendChild(richText(item.body, ST.side));
+      row.append(imgWrap, txt);
+      return row;
+    }
+
+    // 3) csak szöveg, nagy, kiemelt kulcsszavakkal
+    function buildText(item, center) {
+      const d = mkDiv("reveal space-y-6 md:space-y-8 " + (center ? "text-center max-w-3xl mx-auto" : "max-w-4xl"));
+      d.appendChild(richText(item.body, ST.text));
+      return d;
+    }
+
+    // 4) utolsó blokk: középre igazítva, alatta Foglalás gomb
+    function buildFinal(item) {
+      const d = mkDiv("space-y-10 text-center");
+      if (item.image_path) {
+        const w = mkDiv("reveal img-reveal rounded-3xl overflow-hidden bg-[#f5f5f7] aspect-[16/10] max-w-3xl mx-auto");
+        w.appendChild(mkImg(item.image_path, "w-full h-full object-cover"));
+        d.appendChild(w);
+      }
+      const t = buildText(item, true);
+      t.appendChild(ctaButton());
+      d.appendChild(t);
+      return d;
+    }
+
+    async function loadVision() {
+      const [c, it] = await Promise.all([
+        db.from("site_content").select("key,value").in("key", ["vision_title", "vision_teaser", "vision_text", "vision_image"]),
+        db.from("vision_items").select("*").order("sort_order").order("created_at")
+      ]);
+      if (c.error) console.error(c.error);
+      if (it.error) console.error(it.error);
+
+      const v = Object.fromEntries((c.data || []).map((r) => [r.key, r.value || ""]));
+      const items = it.data || [];
+      const title = v.vision_title || "Több mint hajvágás.";
+      const teaser = v.vision_teaser || firstParagraph(v.vision_text);
+      const image = v.vision_image;
+      if (!teaser && !image && !items.length) return;
+
+      /* Főoldali sötét kártya: főcím, Megnézem gomb, rövid szöveg, kép */
+      $("vision-title").textContent = title;
+      const vt = $("vision-text");
+      vt.textContent = "";
+      inline(vt, teaser, "font-semibold text-white");
+      vt.classList.toggle("hidden", !teaser);
+
+      if (image) {
+        $("vision-img").src = publicUrl(image);
+      } else {
+        $("vision-image-wrap").classList.add("hidden");
+        $("vision-grid").classList.remove("md:grid-cols-2");
+      }
+      if (items.length) $("vision-more").classList.remove("hidden");
+      $("vizio").classList.remove("hidden");
+      $("nav-vision").classList.remove("hidden");
+
+      /* Vízió oldal: változatos blokkok, nem diasor */
+      const list = $("vision-items");
+      if (!items.length) { $("vision-items-empty").classList.remove("hidden"); return; }
+
+      const n = items.length;
+      let sideIdx = 0;
+      items.forEach((item, i) => {
+        const hasImg = !!item.image_path;
+        const hasBody = !!(item.body || "").trim();
+
+        let layout = item.layout || "auto";
+        if (i === n - 1 && n > 1) layout = "final";
+        else if (layout === "auto") layout = i === 0 ? (hasImg ? "overlay" : "text") : (hasImg ? "side" : "text");
+        if ((layout === "overlay" || layout === "side") && !hasImg) layout = "text";
+        if (layout === "text" && !hasBody) { if (hasImg) layout = "side"; else return; }
+
+        let el;
+        if (layout === "overlay") el = buildOverlay(item);
+        else if (layout === "side") el = buildSide(item, sideIdx++ % 2 === 1);
+        else if (layout === "final") el = buildFinal(item);
+        else el = buildText(item, false);
+        list.appendChild(el);
+      });
+
+      // ha csak egyetlen blokk van, a Foglalás gomb alatta jelenik meg
+      if (n === 1) {
+        const c2 = mkDiv("reveal text-center");
+        c2.appendChild(ctaButton());
+        list.appendChild(c2);
+      }
+      list.querySelectorAll(".reveal").forEach(watch);
+    }
+
+    /* ================= IDŐPONTVÁLASZTÓ ================= */
+    let slots = [];            // [{ slot_date: "2026-10-20", slot_time: "09:00:00" }]
+    let selectedDate = null;
+    let selectedTime = null;   // pl. "09:00:00"
+
+    const dateChips = $("date-chips");
+    const timeChips = $("time-chips");
+
+    function chipClass(active) {
+      return "shrink-0 rounded-2xl px-4 py-2.5 text-sm font-medium transition " +
+        (active ? "bg-black text-white" : "bg-[#f5f5f7] hover:bg-black/10");
+    }
+
+    function renderSlots() {
+      dateChips.innerHTML = "";
+      timeChips.innerHTML = "";
+      $("slots-loading").classList.add("hidden");
+
+      if (!slots.length) {
+        $("slots-empty").textContent = "Jelenleg nincs szabad időpont. Nézz vissza később!";
+        $("slots-empty").classList.remove("hidden");
+        return;
+      }
+      $("slots-empty").classList.add("hidden");
+
+      const dates = [...new Set(slots.map((s) => s.slot_date))];
+      dates.forEach((d) => {
+        const dt = parseDate(d);
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = chipClass(d === selectedDate) + " text-center leading-tight";
+        b.innerHTML = `<span class="block text-[11px] uppercase tracking-wider opacity-70">${esc(dt.toLocaleDateString("hu-HU", { weekday: "short" }))}</span>` +
+                      `<span class="block">${esc(dt.toLocaleDateString("hu-HU", { month: "short", day: "numeric" }))}</span>`;
+        b.addEventListener("click", () => { selectedDate = d; selectedTime = null; renderSlots(); });
+        dateChips.appendChild(b);
+      });
+
+      slots.filter((s) => s.slot_date === selectedDate).forEach((s) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = chipClass(s.slot_time === selectedTime) + " tabular-nums";
+        b.textContent = hm(s.slot_time);
+        b.addEventListener("click", () => { selectedTime = s.slot_time; renderSlots(); });
+        timeChips.appendChild(b);
+      });
+    }
+
+    async function loadSlots() {
+      const { data, error } = await db.rpc("get_open_slots");
+      if (error) {
+        console.error(error);
+        $("slots-loading").classList.add("hidden");
+        $("slots-empty").textContent = "Az időpontokat nem sikerült betölteni. Próbáld újra később.";
+        $("slots-empty").classList.remove("hidden");
+        return;
+      }
+      slots = data || [];
+      const dates = [...new Set(slots.map((s) => s.slot_date))];
+      if (!dates.includes(selectedDate)) selectedDate = dates[0] || null;
+      if (!slots.some((s) => s.slot_date === selectedDate && s.slot_time === selectedTime)) selectedTime = null;
+      renderSlots();
+    }
+
+    /* ================= FOGLALÁS KÜLDÉSE ================= */
+    const form = $("booking-form");
+    const errorBox = $("form-error");
+    const successBox = $("success-box");
+    const submitBtn = $("submit-btn");
+
+    function showError(msg) { errorBox.textContent = msg; errorBox.classList.remove("hidden"); }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      errorBox.classList.add("hidden");
+      successBox.classList.add("hidden");
+
+      const data = {
+        guest_name:   $("guest_name").value.trim(),
+        phone:        $("phone").value.trim(),
+        email:        $("email").value.trim(),
+        service:      SERVICE_NAME,
+        booking_date: selectedDate,
+        booking_time: selectedTime,
+        status:       "confirmed"
+      };
+
+      if (!data.guest_name || !data.phone || !data.email) return showError("Kérjük, töltsd ki a nevedet, telefonszámodat és e-mail címedet.");
+      if (!/^\S+@\S+\.\S+$/.test(data.email)) return showError("Kérjük, adj meg érvényes e-mail címet.");
+      if (data.phone.replace(/\D/g, "").length < 8) return showError("Kérjük, adj meg érvényes telefonszámot.");
+      if (!data.booking_date || !data.booking_time) return showError("Kérjük, válassz egy időpontot.");
+      if (!$("accept_privacy").checked) return showError("A foglaláshoz el kell fogadnod az adatkezelési tájékoztatót.");
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Mentés…";
+
+      try {
+        // Nem láncolunk .select()-et: a vendégnek nincs olvasási joga a foglalásokhoz
+        const { error } = await db.from("bookings").insert(data);
+
+        if (error) {
+          if (error.code === "23505" || (error.message || "").includes("slot_not_available")) {
+            showError("Ezt az időpontot közben valaki lefoglalta, vagy már nem elérhető. Kérjük, válassz másikat.");
+            await loadSlots();
+          } else {
+            console.error(error);
+            showError("Hiba történt a foglalás mentésekor. Kérjük, próbáld újra.");
+          }
+          return;
+        }
+
+        const niceDate = parseDate(data.booking_date).toLocaleDateString("hu-HU", { year: "numeric", month: "long", day: "numeric", weekday: "long" });
+        $("success-text").textContent =
+          `Köszönjük, ${data.guest_name}! ${SERVICE_NAME} – ${niceDate}, ${hm(data.booking_time)}. Hamarosan találkozunk!`;
+        successBox.classList.remove("hidden");
+        form.reset();
+        selectedTime = null;
+        await loadSlots();
+        successBox.scrollIntoView({ behavior: "smooth", block: "center" });
+      } catch (err) {
+        console.error(err);
+        showError("Nem sikerült kapcsolódni a szerverhez. Ellenőrizd az internetkapcsolatot.");
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Időpont lefoglalása";
+      }
+    });
+
+    /* ================= ÉRTÉKELÉSEK ================= */
+    const stars = (n) => "★".repeat(n) + "☆".repeat(5 - n);
+    let rating = 0;
+
+    const starInput = $("star-input");
+    for (let i = 1; i <= 5; i++) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.setAttribute("role", "radio");
+      b.setAttribute("aria-label", i + " csillag");
+      b.dataset.v = i;
+      b.textContent = "★";
+      b.className = "text-4xl leading-none transition text-black/15 hover:scale-110";
+      b.addEventListener("click", () => { rating = i; paintStars(); });
+      starInput.appendChild(b);
+    }
+    function paintStars() {
+      [...starInput.children].forEach((b) => {
+        const on = Number(b.dataset.v) <= rating;
+        b.classList.toggle("text-amber-400", on);
+        b.classList.toggle("text-black/15", !on);
+        b.setAttribute("aria-checked", on && Number(b.dataset.v) === rating ? "true" : "false");
+      });
+    }
+
+    async function loadReviews() {
+      const list = $("review-list");
+      const { data, error } = await db.from("reviews").select("author_name,rating,comment,created_at")
+        .order("created_at", { ascending: false }).limit(100);
+
+      if (error) {
+        console.error(error);
+        $("rating-summary").textContent = "Az értékeléseket nem sikerült betölteni.";
+        return;
+      }
+      list.innerHTML = "";
+      if (!data.length) {
+        $("rating-summary").textContent = "Még nincs értékelés. Legyél te az első!";
+        return;
+      }
+      const avg = data.reduce((a, r) => a + r.rating, 0) / data.length;
+      $("rating-summary").innerHTML =
+        `<span class="text-amber-400 text-2xl align-middle">${stars(Math.round(avg))}</span> ` +
+        `<span class="align-middle">${avg.toFixed(1).replace(".", ",")} / 5 · ${data.length} értékelés</span>`;
+
+      data.forEach((r, i) => {
+        const card = document.createElement("article");
+        card.className = "reveal rounded-3xl bg-[#f5f5f7] p-6";
+        card.style.transitionDelay = (Math.min(i, 4) * 60) + "ms";
+        card.innerHTML =
+          `<div class="flex items-center justify-between gap-4 mb-2">` +
+            `<span class="font-semibold">${esc(r.author_name)}</span>` +
+            `<span class="text-amber-400 tracking-wide">${stars(r.rating)}</span>` +
+          `</div>` +
+          `<p class="text-[#3a3a3c] whitespace-pre-line">${esc(r.comment)}</p>` +
+          `<p class="text-xs text-[#86868b] mt-3">${esc(new Date(r.created_at).toLocaleDateString("hu-HU", { year: "numeric", month: "long", day: "numeric" }))}</p>`;
+        list.appendChild(card);
+        watch(card);
+      });
+    }
+
+    const reviewForm = $("review-form");
+    const reviewMsg = $("review-msg");
+    function showReviewMsg(text, ok) {
+      reviewMsg.textContent = text;
+      reviewMsg.className = "rounded-2xl px-4 py-3 text-sm " + (ok ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700");
+    }
+
+    reviewForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      reviewMsg.className = "hidden";
+
+      const name = $("r_name").value.trim();
+      const comment = $("r_comment").value.trim();
+
+      if ($("r_website").value) { // spam-csapda
+        reviewForm.reset(); rating = 0; paintStars();
+        return showReviewMsg("Köszönjük az értékelést!", true);
+      }
+      if (!name) return showReviewMsg("Kérjük, add meg a neved.", false);
+      if (!rating) return showReviewMsg("Kérjük, válassz csillagot.", false);
+      if (!comment) return showReviewMsg("Kérjük, írj egy rövid véleményt.", false);
+      if (!$("accept_review").checked) return showReviewMsg("Az értékelés beküldéséhez add meg a hozzájárulásodat.", false);
+
+      const btn = $("review-btn");
+      btn.disabled = true; btn.textContent = "Küldés…";
+      try {
+        const { error } = await db.from("reviews").insert({ author_name: name, rating, comment });
+        if (error) {
+          console.error(error);
+          return showReviewMsg("Az értékelést nem sikerült elmenteni. Próbáld újra.", false);
+        }
+        reviewForm.reset(); rating = 0; paintStars();
+        showReviewMsg("Köszönjük az értékelést!", true);
+        await loadReviews();
+      } catch (err) {
+        console.error(err);
+        showReviewMsg("Nem sikerült kapcsolódni a szerverhez.", false);
+      } finally {
+        btn.disabled = false; btn.textContent = "Értékelés beküldése";
+      }
+    });
+
+    /* ================= ADATKEZELŐ ADATAI (az adatkezelési tájékoztatóhoz) ================= */
+    async function loadOwner() {
+      const { data, error } = await db.from("site_content").select("key,value")
+        .in("key", ["owner_name", "owner_address", "owner_email", "owner_phone", "owner_taxid"]);
+      if (error) console.error(error);
+      const v = Object.fromEntries((data || []).map((r) => [r.key, (r.value || "").trim()]));
+      const missing = "(az adatkezelő még nem adta meg)";
+
+      $("pv-name").textContent = v.owner_name || missing;
+      $("pv-address").textContent = v.owner_address || missing;
+      $("pv-phone").textContent = v.owner_phone || missing;
+      if (v.owner_taxid) { $("pv-taxid").textContent = v.owner_taxid; $("pv-taxid-row").classList.remove("hidden"); }
+
+      document.querySelectorAll(".pv-email").forEach((el) => {
+        el.textContent = "";
+        if (v.owner_email) {
+          const a = document.createElement("a");
+          a.href = "mailto:" + v.owner_email;
+          a.textContent = v.owner_email;
+          el.appendChild(a);
+        } else {
+          el.textContent = missing;
+        }
+      });
+    }
+
+    /* ================= INDULÁS ================= */
+    route();
+    loadOwner();
+    loadPrice();
+    loadGallery();
+    loadVision();
+    loadSlots();
+    loadReviews();
+  </script>
+</body>
+</html>
