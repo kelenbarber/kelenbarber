@@ -100,6 +100,48 @@
       .reveal { opacity: 1; transform: none; transition: none; }
       .img-reveal img { transform: none; transition: none; }
     }
+
+    /* ================= CSAK TELEFON (max. 767 px) ================= */
+    /* A hero kép beállításai telefonon. Ezeket a számokat lehet átírni:
+       --hero-x: vízszintes pozíció (0% = a kép bal széle látszik, 100% = a jobb széle)
+       --hero-h: a kép magassága a kijelző szélességéhez mérten (150vw = a szélesség másfélszerese).
+                 Kisebb szám = több látszik a képből oldalra, nagyobb szám = közelebbi, keskenyebb kivágás.
+                 A kép alja sötétbe úszik át, a kijelző többi része a sötét háttér.
+       --hero-zoom: extra nagyítás (1 = nincs, 1.1 = 10% nagyítás) */
+    :root { --hero-x: 36%; --hero-h: 150vw; --hero-zoom: 1; }
+
+    @media (max-width: 767px) {
+      /* A háttérkép külön elemként jelenik meg, így a pozíciója és nagyítása állítható */
+      #top { background-image: none; }
+      #hero-photo {
+        bottom: auto;
+        height: min(100vh, var(--hero-h));
+        height: min(100svh, var(--hero-h));
+        object-fit: cover;
+        object-position: var(--hero-x) 0%;
+        transform: scale(var(--hero-zoom));
+        transform-origin: var(--hero-x) 0%;
+        -webkit-mask-image: linear-gradient(to bottom, #000 78%, transparent 100%);
+        mask-image: linear-gradient(to bottom, #000 78%, transparent 100%);
+      }
+      #hero-shade {
+        background-image:
+          linear-gradient(to bottom, rgba(0,0,0,.55) 0%, rgba(0,0,0,.30) 40%, rgba(0,0,0,.80) 100%),
+          radial-gradient(60% 50% at 50% 38%, rgba(255,255,255,.10) 0%, rgba(255,255,255,0) 70%);
+      }
+
+      /* A kelenbarber felirat majdnem szélről szélre (a pontos méretet a script számolja ki) */
+      #hero-title { display: inline-block; white-space: nowrap; font-size: 17vw; }
+
+      /* A "Görgess" felirat pontosan középen (a ugráló animáció felülírta az eltolását) */
+      #scroll-hint { left: 0; right: 0; text-align: center; }
+    }
+
+    /* Telefonon csökkentett mozgás beállításnál is finom áttűnés marad (csak halványodás, mozgás nélkül) */
+    @media (max-width: 767px) and (prefers-reduced-motion: reduce) {
+      .reveal { opacity: 0; transform: none; transition: opacity .9s ease; }
+      .reveal.in-view { opacity: 1; }
+    }
   </style>
 </head>
 
@@ -125,17 +167,20 @@
 
     <!-- HERO (sticky: a következő szekció ráúszik) -->
     <section id="top" class="sticky top-0 z-0 hero-bg flex items-center justify-center overflow-hidden">
+      <img id="hero-photo" src="hero.jpg" alt="" aria-hidden="true" draggable="false" onerror="this.remove()"
+           class="md:hidden absolute inset-0 w-full h-full select-none pointer-events-none" />
+      <div id="hero-shade" class="md:hidden absolute inset-0 pointer-events-none"></div>
       <div id="hero-content" class="relative text-center px-6">
         <h1 class="text-5xl sm:text-8xl md:text-[9rem] font-semibold tracking-tight leading-[1.02] text-white">
-          <span class="bg-gradient-to-b from-white to-white/40 bg-clip-text text-transparent">kelenbarber</span>
+          <span id="hero-title" class="bg-gradient-to-b from-white to-white/40 bg-clip-text text-transparent">kelenbarber</span>
         </h1>
         <a href="#foglalas"
-           class="inline-block mt-10 rounded-full bg-white text-black px-8 py-3.5 text-base font-medium hover:scale-[1.03] active:scale-100 transition">
+           class="inline-block mt-6 md:mt-10 rounded-full bg-white text-black px-5 py-2.5 text-sm md:px-8 md:py-3.5 md:text-base font-medium hover:scale-[1.03] active:scale-100 transition">
           Időpont foglalása
         </a>
       </div>
 
-      <div class="absolute bottom-8 left-1/2 -translate-x-1/2 text-white/50 text-xs tracking-widest animate-bounce">GÖRGESS ↓</div>
+      <div id="scroll-hint" class="absolute bottom-8 left-1/2 -translate-x-1/2 text-white/50 text-xs tracking-widest animate-bounce">GÖRGESS ↓</div>
     </section>
 
     <!-- TARTALOM: ráúszik a hero-ra -->
@@ -145,7 +190,7 @@
       <section id="galeria" class="max-w-5xl mx-auto px-6 pt-28 md:pt-40 pb-24 md:pb-36">
         <p class="reveal text-sm font-medium tracking-[0.25em] text-[#86868b] uppercase mb-10">Galéria</p>
 
-        <div id="gallery-grid" class="grid grid-cols-3 gap-2 md:gap-5"></div>
+        <div id="gallery-grid" class="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-5"></div>
         <p id="gallery-empty" class="hidden text-center text-[#86868b] py-16">Hamarosan itt lesznek a legújabb vágások.</p>
 
         <div id="gallery-more" class="reveal hidden text-center mt-12 md:mt-16">
@@ -339,7 +384,7 @@
           <h3>Időpontfoglalás</h3>
           <ul>
             <li><strong>Kezelt adatok:</strong> név, telefonszám, e-mail cím, a választott szolgáltatás, a foglalt időpont (dátum és idő), a foglalás állapota (megerősített vagy lemondott) és a foglalás rögzítésének ideje.</li>
-            <li><strong>Cél:</strong> az időpont lefoglalása és nyilvántartása, a szolgáltatás nyújtása, valamint kapcsolatfelvétel a foglalással kapcsolatban (például lemondás vagy változás esetén).</li>
+            <li><strong>Cél:</strong> az időpont lefoglalása és nyilvántartása, a szolgáltatás nyújtása, valamint kapcsolatfelvétel a foglalással kapcsolatban (például lemondás vagy változás esetén). A foglalás után automatikus visszaigazoló e-mailt küldünk az általad megadott e-mail címre, lemondás esetén pedig értesítést; a foglalásról a szolgáltató is e-mailes értesítést kap.</li>
             <li><strong>Jogalap:</strong> GDPR 6. cikk (1) bekezdés b) pont, vagyis a szerződés megkötését megelőzően az érintett kérésére történő lépések megtétele.</li>
             <li><strong>Megőrzés:</strong> a foglalt időpontot követő legfeljebb 12 hónapig, ezután töröljük.</li>
           </ul>
@@ -367,6 +412,7 @@
           <li>A foglalási adataidhoz csak az adatkezelő fér hozzá, jelszóval védett felületen keresztül. Az adatbázis úgy van beállítva, hogy a weboldal látogatói mások foglalási adatait nem láthatják.</li>
           <li><strong>Supabase (Supabase Inc.):</strong> az adatbázis és a képtároló szolgáltatója, adatfeldolgozóként tárolja a foglalásokat, az értékeléseket és a feltöltött képeket.</li>
           <li><strong>GitHub (GitHub, Inc.):</strong> az oldal kiszolgálását végzi.</li>
+          <li><strong>Resend (Resend, Inc.):</strong> az automatikus e-mailek (foglalás visszaigazolása, lemondási értesítés) kiküldését végzi, ehhez megkapja a címzett e-mail címét, a nevedet és a foglalás adatait.</li>
           <li>Az említett szolgáltatók az Európai Gazdasági Térségen kívül, például az Egyesült Államokban is kezelhetnek adatokat. Az adattovábbítás az adott szolgáltató által alkalmazott megfelelő garanciák (például általános szerződési feltételek) mellett történik.</li>
           <li>Az adataidat nem adjuk el, marketing célra nem használjuk, hírlevelet nem küldünk, automatizált döntéshozatalt és profilalkotást nem végzünk.</li>
         </ul>
@@ -446,13 +492,51 @@
     $("year").textContent = new Date().getFullYear();
 
     /* ================= GÖRGETÉS ANIMÁCIÓK ================= */
+    const MOBILE = window.matchMedia("(max-width: 767px)");
     const io = new IntersectionObserver((entries) => {
       entries.forEach((en) => {
         if (en.isIntersecting) { en.target.classList.add("in-view"); io.unobserve(en.target); }
       });
-    }, { threshold: 0.12, rootMargin: "0px 0px -6% 0px" });
+    }, { threshold: MOBILE.matches ? 0.05 : 0.12, rootMargin: "0px 0px -6% 0px" });
     const watch = (el) => io.observe(el);
     document.querySelectorAll(".reveal").forEach(watch);
+
+    /* ---- Csak telefon: biztonsági ellenőrzés a beúszáshoz ----
+       Az iPhone/Android böngészők néha kihagyják az IntersectionObserver jelzését,
+       ezért görgetéskor külön is megnézzük, mely elemek értek a látható területre. */
+    let revealTick = false;
+    function revealCheck() {
+      revealTick = false;
+      if (!MOBILE.matches) return;
+      const limit = window.innerHeight * 0.94;
+      document.querySelectorAll(".reveal:not(.in-view)").forEach((el) => {
+        if (el.offsetParent === null) return;                 // rejtett nézetben lévő elem
+        if (el.getBoundingClientRect().top < limit) { el.classList.add("in-view"); io.unobserve(el); }
+      });
+    }
+    function scheduleRevealCheck() {
+      if (revealTick) return;
+      revealTick = true;
+      requestAnimationFrame(revealCheck);
+    }
+    window.addEventListener("scroll", scheduleRevealCheck, { passive: true });
+    window.addEventListener("resize", scheduleRevealCheck);
+    window.addEventListener("load", scheduleRevealCheck);
+
+    /* ---- Csak telefon: a hero felirat majdnem szélről szélre ---- */
+    function fitHeroTitle() {
+      const el = $("hero-title");
+      if (!MOBILE.matches) { el.style.fontSize = ""; return; }
+      el.style.fontSize = "100px";
+      const w = el.getBoundingClientRect().width;
+      const avail = document.documentElement.clientWidth - 48;   // 24 px margó mindkét oldalon
+      if (w > 0) el.style.fontSize = (Math.floor((100 * avail / w) * 10) / 10) + "px";
+    }
+    fitHeroTitle();
+    window.addEventListener("resize", fitHeroTitle);
+    window.addEventListener("orientationchange", fitHeroTitle);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitHeroTitle);
+    window.addEventListener("hashchange", () => requestAnimationFrame(() => { fitHeroTitle(); revealCheck(); }));
 
     const heroContent = $("hero-content");
     let ticking = false;
