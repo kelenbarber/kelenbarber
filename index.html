@@ -77,7 +77,8 @@
     /* Almenükön a felső sáv sötétebb, hogy a fehér háttéren is olvasható legyen */
     body[data-page="gallery"] #site-nav,
     body[data-page="vision"] #site-nav,
-    body[data-page="privacy"] #site-nav { background-color: rgba(10,10,10,.92) !important; }
+    body[data-page="privacy"] #site-nav,
+    body[data-page="cancel"] #site-nav { background-color: rgba(10,10,10,.92) !important; }
 
     input, select, textarea { -webkit-appearance: none; appearance: none; }
     input[type="checkbox"] { -webkit-appearance: auto; appearance: auto; }
@@ -359,6 +360,34 @@
     </div>
   </div>
 
+  <!-- ====================== FOGLALÁS LEMONDÁSA (az e-mailben kapott linkről) ====================== -->
+  <div id="view-cancel" class="hidden relative z-10 bg-white min-h-[75vh]">
+    <div class="max-w-xl mx-auto px-6 pt-28 md:pt-36 pb-24 md:pb-32 text-center">
+      <h1 class="text-4xl md:text-5xl font-semibold tracking-tight leading-tight mb-10">Foglalás lemondása</h1>
+
+      <p id="cancel-loading" class="text-[#6e6e73]">Foglalás betöltése…</p>
+
+      <div id="cancel-card" class="hidden rounded-3xl bg-[#f5f5f7] p-6 md:p-8 text-left mb-6">
+        <p class="text-xs uppercase tracking-[0.2em] text-[#86868b] mb-1">Szolgáltatás</p>
+        <p id="cancel-service" class="text-lg font-semibold mb-5"></p>
+        <p class="text-xs uppercase tracking-[0.2em] text-[#86868b] mb-1">Időpont</p>
+        <p id="cancel-when" class="text-lg font-semibold capitalize"></p>
+      </div>
+
+      <p id="cancel-msg" class="hidden"></p>
+
+      <div id="cancel-actions" class="hidden flex flex-col sm:flex-row gap-3 justify-center">
+        <button id="cancel-confirm" type="button"
+                class="rounded-full bg-black text-white px-8 py-3.5 text-base font-medium hover:bg-black/85 active:scale-[0.99] transition disabled:opacity-50">
+          Foglalás lemondása
+        </button>
+        <a href="#top" class="rounded-full bg-black/5 hover:bg-black/10 px-8 py-3.5 text-base font-medium transition">Mégsem</a>
+      </div>
+
+      <a id="cancel-new" href="#foglalas" class="hidden inline-block rounded-full bg-black text-white px-8 py-3.5 text-base font-medium hover:bg-black/85 transition">Új időpont foglalása</a>
+    </div>
+  </div>
+
   <!-- ====================== ADATKEZELÉSI TÁJÉKOZTATÓ ====================== -->
   <div id="view-privacy" class="hidden relative z-10 bg-white min-h-[75vh]">
     <div class="max-w-3xl mx-auto px-6 pt-28 md:pt-36 pb-24 md:pb-32">
@@ -384,7 +413,7 @@
           <h3>Időpontfoglalás</h3>
           <ul>
             <li><strong>Kezelt adatok:</strong> név, telefonszám, e-mail cím, a választott szolgáltatás, a foglalt időpont (dátum és idő), a foglalás állapota (megerősített vagy lemondott) és a foglalás rögzítésének ideje.</li>
-            <li><strong>Cél:</strong> az időpont lefoglalása és nyilvántartása, a szolgáltatás nyújtása, valamint kapcsolatfelvétel a foglalással kapcsolatban (például lemondás vagy változás esetén). A foglalás után automatikus visszaigazoló e-mailt küldünk az általad megadott e-mail címre, lemondás esetén pedig értesítést; a foglalásról a szolgáltató is e-mailes értesítést kap.</li>
+            <li><strong>Cél:</strong> az időpont lefoglalása és nyilvántartása, a szolgáltatás nyújtása, valamint kapcsolatfelvétel a foglalással kapcsolatban (például lemondás vagy változás esetén). A foglalás után automatikus visszaigazoló e-mailt küldünk az általad megadott e-mail címre, amely egy személyes lemondási linket is tartalmaz, lemondás esetén pedig értesítést; a foglalásról a szolgáltató is e-mailes értesítést kap.</li>
             <li><strong>Jogalap:</strong> GDPR 6. cikk (1) bekezdés b) pont, vagyis a szerződés megkötését megelőzően az érintett kérésére történő lépések megtétele.</li>
             <li><strong>Megőrzés:</strong> a foglalt időpontot követő legfeljebb 12 hónapig, ezután töröljük.</li>
           </ul>
@@ -562,12 +591,13 @@
 
     function route() {
       const h = location.hash;
-      const next = h === "#/galeria" ? "gallery" : h === "#/vizio" ? "vision" : h === "#/adatvedelem" ? "privacy" : "home";
-      if (next === currentPage) return;
+      const next = h.startsWith("#/lemondas/") ? "cancel" : h === "#/galeria" ? "gallery" : h === "#/vizio" ? "vision" : h === "#/adatvedelem" ? "privacy" : "home";
+      if (next === currentPage && next !== "cancel") return;
 
       if (currentPage === "home") homeScrollY = window.scrollY;
-      ["home", "gallery", "vision", "privacy"].forEach((p) => $("view-" + p).classList.toggle("hidden", p !== next));
+      ["home", "gallery", "vision", "privacy", "cancel"].forEach((p) => $("view-" + p).classList.toggle("hidden", p !== next));
       document.body.dataset.page = next;
+      if (next === "cancel") loadCancelView(h.slice("#/lemondas/".length));
 
       const prev = currentPage;
       currentPage = next;
@@ -1052,12 +1082,111 @@
       }
     });
 
+    /* ================= FOGLALÁS LEMONDÁSA (az e-mailben kapott személyes linkről) ================= */
+    const CANCEL_PREFIX = "#/lemondas/";
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    let cancelToken = null;
+    let OWNER = {};
+
+    function cancelUI(state) {                      // "loading" | "ready" | "message"
+      $("cancel-loading").classList.toggle("hidden", state !== "loading");
+      $("cancel-actions").classList.toggle("hidden", state !== "ready");
+    }
+
+    function showCancelMsg(text, kind, showNew) {
+      const m = $("cancel-msg");
+      m.textContent = text;
+      m.className = "rounded-2xl px-5 py-4 text-sm md:text-base mb-6 text-left " +
+        (kind === "ok" ? "bg-green-50 text-green-700" : kind === "err" ? "bg-red-50 text-red-700" : "bg-[#f5f5f7] text-[#3a3a3c]");
+      $("cancel-new").classList.toggle("hidden", !showNew);
+    }
+
+    function ownerContactText() {
+      const parts = [OWNER.owner_phone, OWNER.owner_email].filter(Boolean);
+      return parts.length ? " Kapcsolat: " + parts.join(" · ") + "." : "";
+    }
+
+    async function loadCancelView(raw) {
+      const token = String(raw || "").split(/[?&]/)[0].trim();
+      cancelToken = UUID_RE.test(token) ? token : null;
+
+      $("cancel-card").classList.add("hidden");
+      $("cancel-msg").textContent = "";
+      $("cancel-msg").className = "hidden";
+      $("cancel-new").classList.add("hidden");
+      cancelUI("loading");
+
+      if (!cancelToken) {
+        cancelUI("message");
+        return showCancelMsg("Ez a lemondási link érvénytelen. Kérjük, használd az e-mailben kapott linket.", "err", false);
+      }
+
+      const { data, error } = await db.rpc("get_booking_by_token", { p_token: cancelToken });
+      if (error) {
+        console.error(error);
+        cancelUI("message");
+        return showCancelMsg("A foglalást nem sikerült betölteni. Kérjük, próbáld újra később." + ownerContactText(), "err", false);
+      }
+      const b = data && data[0];
+      if (!b) {
+        cancelUI("message");
+        return showCancelMsg("Ez a foglalás nem található. Lehet, hogy a link hibás." + ownerContactText(), "err", false);
+      }
+
+      $("cancel-service").textContent = b.b_service;
+      $("cancel-when").textContent =
+        parseDate(b.b_date).toLocaleDateString("hu-HU", { year: "numeric", month: "long", day: "numeric", weekday: "long" }) + ", " + hm(b.b_time);
+      $("cancel-card").classList.remove("hidden");
+
+      if (b.b_status === "cancelled") {
+        cancelUI("message");
+        return showCancelMsg("Ezt a foglalást már lemondták.", "info", true);
+      }
+      if (!b.b_can_cancel) {
+        cancelUI("message");
+        const h = Number(b.b_deadline_hours) || 0;
+        return showCancelMsg(
+          (h > 0 ? `A foglalást az időpont előtt legkésőbb ${h} órával lehet lemondani, ez a határidő már lejárt.`
+                 : "Ez az időpont már elmúlt, ezért a foglalás nem mondható le.") + ownerContactText(),
+          "info", false);
+      }
+      cancelUI("ready");
+    }
+
+    $("cancel-confirm").addEventListener("click", async () => {
+      if (!cancelToken) return;
+      const btn = $("cancel-confirm");
+      btn.disabled = true; btn.textContent = "Lemondás…";
+      try {
+        const { data, error } = await db.rpc("cancel_booking_by_token", { p_token: cancelToken });
+        if (error) throw error;
+        cancelUI("message");
+        if (data === "ok") {
+          showCancelMsg("A foglalásodat lemondtuk. A lemondásról e-mailt is küldünk.", "ok", true);
+          loadSlots();                                        // az időpont újra szabad
+        } else if (data === "already_cancelled") {
+          showCancelMsg("Ezt a foglalást már lemondták.", "info", true);
+        } else if (data === "too_late") {
+          showCancelMsg("A lemondási határidő lejárt, a foglalás már nem mondható le." + ownerContactText(), "info", false);
+        } else {
+          showCancelMsg("Ez a foglalás nem található." + ownerContactText(), "err", false);
+        }
+      } catch (err) {
+        console.error(err);
+        showCancelMsg("A lemondás nem sikerült. Kérjük, próbáld újra." + ownerContactText(), "err", false);
+        cancelUI("ready");
+      } finally {
+        btn.disabled = false; btn.textContent = "Foglalás lemondása";
+      }
+    });
+
     /* ================= ADATKEZELŐ ADATAI (az adatkezelési tájékoztatóhoz) ================= */
     async function loadOwner() {
       const { data, error } = await db.from("site_content").select("key,value")
         .in("key", ["owner_name", "owner_address", "owner_email", "owner_phone", "owner_taxid"]);
       if (error) console.error(error);
       const v = Object.fromEntries((data || []).map((r) => [r.key, (r.value || "").trim()]));
+      OWNER = v;
       const missing = "(az adatkezelő még nem adta meg)";
 
       $("pv-name").textContent = v.owner_name || missing;
